@@ -61,14 +61,21 @@ public class InputListener implements Listener {
             event.setCancelled(true);
             String message = event.getMessage();
 
-            if (message.equalsIgnoreCase("cancel")) {
+            if (message.trim().equalsIgnoreCase("cancel")) {
                 renamingHome.remove(player.getUniqueId());
                 player.sendMessage(plugin.getMessage("creation-cancelled"));
                 soundManager.play(player, "gui-click");
                 return;
             }
 
-            if (homeManager.hasHome(player, message)) {
+            String newName = plugin.validateHomeName(message);
+            if (newName == null) {
+                player.sendMessage(plugin.getMessage("invalid-name"));
+                soundManager.play(player, "teleport-fail");
+                return;
+            }
+
+            if (homeManager.hasHome(player, newName)) {
                 player.sendMessage(plugin.getMessage("home-exists"));
                 soundManager.play(player, "teleport-fail");
                 return;
@@ -78,8 +85,8 @@ public class InputListener implements Listener {
             
             // Run on main thread
             plugin.getServer().getScheduler().runTask(plugin, () -> {
-                homeManager.renameHome(player.getUniqueId(), oldName, message);
-                player.sendMessage(plugin.getMessage("home-renamed").replace("{old}", oldName).replace("{new}", message));
+                homeManager.renameHome(player.getUniqueId(), oldName, newName);
+                player.sendMessage(plugin.getMessage("home-renamed").replace("{old}", oldName).replace("{new}", newName));
                 soundManager.play(player, "teleport-success");
                 
                 if (homeGUI != null) {
@@ -96,14 +103,21 @@ public class InputListener implements Listener {
         event.setCancelled(true);
         String message = event.getMessage();
 
-        if (message.equalsIgnoreCase("cancel")) {
+        if (message.trim().equalsIgnoreCase("cancel")) {
             creatingHome.remove(player.getUniqueId());
             player.sendMessage(plugin.getMessage("creation-cancelled"));
             soundManager.play(player, "gui-click");
             return;
         }
 
-        if (homeManager.hasHome(player, message)) {
+        String homeName = plugin.validateHomeName(message);
+        if (homeName == null) {
+            player.sendMessage(plugin.getMessage("invalid-name"));
+            soundManager.play(player, "teleport-fail");
+            return;
+        }
+
+        if (homeManager.hasHome(player, homeName)) {
             player.sendMessage(plugin.getMessage("home-exists"));
             soundManager.play(player, "teleport-fail");
             return;
@@ -118,8 +132,8 @@ public class InputListener implements Listener {
                 return;
             }
 
-            homeManager.setHome(player, message, player.getLocation());
-            player.sendMessage(plugin.getMessage("home-created").replace("{name}", message));
+            homeManager.setHome(player, homeName, player.getLocation());
+            player.sendMessage(plugin.getMessage("home-created").replace("{name}", homeName));
             soundManager.play(player, "teleport-success"); // Or home-created sound
             creatingHome.remove(player.getUniqueId());
             

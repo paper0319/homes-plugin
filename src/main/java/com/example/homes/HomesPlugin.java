@@ -1,6 +1,7 @@
 package com.example.homes;
 
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -105,6 +106,22 @@ public class HomesPlugin extends JavaPlugin {
         return ChatColor.translateAlternateColorCodes('&', msg);
     }
 
+    public String validateHomeName(String raw) {
+        if (raw == null) return null;
+        String name = raw.trim();
+        if (name.isEmpty()) return null;
+
+        if (name.equalsIgnoreCase("cancel")) return null;
+
+        int maxLen = getConfig().getInt("settings.max-home-name-length", 32);
+        if (maxLen > 0 && name.length() > maxLen) return null;
+
+        String regex = getConfig().getString("settings.home-name-regex", "^[^\\\\s:\\\\u00A7]+$");
+        if (!Pattern.compile(regex).matcher(name).matches()) return null;
+
+        return name;
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         
@@ -134,7 +151,11 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
 
-            String homeName = args[0];
+            String homeName = validateHomeName(args[0]);
+            if (homeName == null) {
+                player.sendMessage(getMessage("invalid-name"));
+                return true;
+            }
             if (homeManager.hasHome(player, homeName)) {
                 player.sendMessage(getMessage("home-exists"));
                 return true;

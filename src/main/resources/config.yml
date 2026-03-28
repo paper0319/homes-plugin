@@ -3,7 +3,12 @@ settings:
   # OP/管理者権限を持つプレイヤーのホーム上限 (デフォルト: 100)
   # -1 に設定すると無制限になります（実際にはInteger.MAX_VALUE）
   op-home-limit: 100
+  max-home-name-length: 32
+  home-name-regex: '^[^\s:\u00A7]+$'
   teleport-delay: 3
+  safe-teleport:
+    search-radius: 2
+    vertical-range: 3
   # TPA Settings
   tpa:
     enabled: true
@@ -41,6 +46,8 @@ sounds:
 gui:
   title: "ホーム一覧"
   delete-mode-title: "&c削除モード (クリックで削除)"
+  public-mode-title: "&b公開設定モード (クリックで切替)"
+  rename-mode-title: "&eリネームモード (クリックで名前変更)"
   create-button:
     name: "&aホームを作成する"
     lore:
@@ -61,6 +68,14 @@ gui:
     lore-on:
       - "&7クリックしてOFFにする"
       - "&cホームをクリックすると削除確認画面へ移動します！"
+  public-button:
+    name-off: "&a公開設定モード: OFF"
+    name-on: "&b公開設定モード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&bホームをクリックすると公開/非公開を切り替えます"
   home-icon:
     name: "&b{name}"
     default-material: LIGHT_BLUE_BED
@@ -90,6 +105,7 @@ gui:
 messages:
   prefix: "&6[Homes] &r"
   no-permission: "&c権限がありません。"
+  only-player: "&cこのコマンドはプレイヤーのみ実行できます。"
   home-set: "&aホーム &e{name} &aを設定しました。"
   home-created: "&aホーム &e{name} &aを作成しました。"
   home-deleted: "&cホーム &e{name} &cを削除しました。"
@@ -97,6 +113,7 @@ messages:
   teleport-success: "&aテレポートしました！"
   teleport-start: "&e{seconds}秒後にテレポートします..."
   teleport-cancelled: "&c移動したためテレポートをキャンセルしました。"
+  teleport-unsafe: "&c危険な場所のためテレポートできませんでした。"
   max-homes-reached: "&cこれ以上ホームを作成できません (最大: {max})"
   invalid-name: "&cホーム名に使用できない文字が含まれています。"
   player-not-found: "&cプレイヤーが見つかりません。"
