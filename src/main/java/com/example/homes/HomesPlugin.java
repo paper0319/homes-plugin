@@ -2,6 +2,7 @@ package com.example.homes;
 
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -39,6 +40,10 @@ public class HomesPlugin extends JavaPlugin {
     @SuppressWarnings("unused")
     private DeathListener deathListener;
 
+    private volatile Pattern homeNamePattern = Pattern.compile("^[^\\s:\\u00A7]+$");
+    private volatile int maxHomeNameLength = 32;
+    private volatile int maxHomeMemoLength = 15;
+
     public TeleportManager getTeleportManager() {
         return teleportManager;
     }
@@ -50,6 +55,7 @@ public class HomesPlugin extends JavaPlugin {
         // Update config with new keys if missing
         getConfig().options().copyDefaults(true);
         saveConfig();
+        reloadValidationSettings();
 
         this.tpaManager = new TpaManager(this);
         
@@ -106,6 +112,25 @@ public class HomesPlugin extends JavaPlugin {
         return ChatColor.translateAlternateColorCodes('&', msg);
     }
 
+    public void reloadValidationSettings() {
+        int maxLen = getConfig().getInt("settings.max-home-name-length", 32);
+        int memoMaxLen = getConfig().getInt("settings.max-home-memo-length", 15);
+        String regex = getConfig().getString("settings.home-name-regex", "^[^\\s:\\u00A7]+$");
+        Pattern compiled;
+        try {
+            compiled = Pattern.compile(regex);
+        } catch (PatternSyntaxException e) {
+            compiled = Pattern.compile("^[^\\s:\\u00A7]+$");
+        }
+        this.maxHomeNameLength = maxLen;
+        this.maxHomeMemoLength = memoMaxLen;
+        this.homeNamePattern = compiled;
+    }
+
+    public int getMaxHomeMemoLength() {
+        return maxHomeMemoLength;
+    }
+
     public String validateHomeName(String raw) {
         if (raw == null) return null;
         String name = raw.trim();
@@ -113,11 +138,10 @@ public class HomesPlugin extends JavaPlugin {
 
         if (name.equalsIgnoreCase("cancel")) return null;
 
-        int maxLen = getConfig().getInt("settings.max-home-name-length", 32);
+        int maxLen = this.maxHomeNameLength;
         if (maxLen > 0 && name.length() > maxLen) return null;
 
-        String regex = getConfig().getString("settings.home-name-regex", "^[^\\\\s:\\\\u00A7]+$");
-        if (!Pattern.compile(regex).matcher(name).matches()) return null;
+        if (!this.homeNamePattern.matcher(name).matches()) return null;
 
         return name;
     }
@@ -132,6 +156,7 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
             reloadConfig();
+            reloadValidationSettings();
             homeManager.reload();
             sender.sendMessage(getMessage("reload-success"));
             return true;

@@ -16,6 +16,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -23,6 +24,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -46,6 +48,9 @@ public class HomeGUI implements Listener {
     private final Set<UUID> deleteModePlayers = new HashSet<>();
     private final Set<UUID> publicModePlayers = new HashSet<>();
     private final Set<UUID> renameModePlayers = new HashSet<>();
+    private final Set<UUID> favoriteModePlayers = new HashSet<>();
+    private final Set<UUID> memoModePlayers = new HashSet<>();
+    private final Map<UUID, String> searchQuery = new HashMap<>();
     
     // Pagination state
     private final Map<UUID, Integer> currentStartIndex = new HashMap<>();
@@ -65,6 +70,15 @@ public class HomeGUI implements Listener {
         this.inputListener = inputListener;
     }
 
+    public void setSearchQuery(UUID viewer, String query) {
+        String q = query == null ? "" : query.trim();
+        if (q.isEmpty()) {
+            searchQuery.remove(viewer);
+        } else {
+            searchQuery.put(viewer, q);
+        }
+    }
+
     public void open(Player player) {
         open(player, player);
     }
@@ -78,16 +92,22 @@ public class HomeGUI implements Listener {
         boolean deleteMode = deleteModePlayers.contains(viewer.getUniqueId());
         boolean publicMode = publicModePlayers.contains(viewer.getUniqueId());
         boolean renameMode = renameModePlayers.contains(viewer.getUniqueId());
+        boolean favoriteMode = favoriteModePlayers.contains(viewer.getUniqueId());
+        boolean memoMode = memoModePlayers.contains(viewer.getUniqueId());
         
         String titleKey = "gui.title";
         if (deleteMode) titleKey = "gui.delete-mode-title";
         else if (publicMode) titleKey = "gui.public-mode-title";
         else if (renameMode) titleKey = "gui.rename-mode-title";
+        else if (favoriteMode) titleKey = "gui.favorite-mode-title";
+        else if (memoMode) titleKey = "gui.memo-mode-title";
         
         String defaultTitle = "ホーム一覧";
         if (deleteMode) defaultTitle = "&c削除モード (クリックで削除)";
         else if (publicMode) defaultTitle = "&b公開設定モード (クリックで切替)";
         else if (renameMode) defaultTitle = "&eリネームモード (クリックで名前変更)";
+        else if (favoriteMode) defaultTitle = "&eお気に入りモード (クリックで切替)";
+        else if (memoMode) defaultTitle = "&eメモ編集モード (クリックで編集)";
         
         if (!isOwner) {
             String name = target.getName() != null ? target.getName() : "Unknown";
@@ -101,7 +121,21 @@ public class HomeGUI implements Listener {
         // HomeManager.getHomes(OfflinePlayer) or getHomes(UUID) needed
         Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
         List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
+        String query = searchQuery.getOrDefault(viewer.getUniqueId(), "");
+        if (!query.isEmpty()) {
+            String qLower = query.toLowerCase();
+            visibleHomes.removeIf(n -> !n.toLowerCase().contains(qLower));
+        }
+
         Collections.sort(visibleHomes); // Sort by name for consistent order
+        if (isOwner) {
+            visibleHomes.sort((a, b) -> {
+                boolean af = homeManager.isFavorite(target.getUniqueId(), a);
+                boolean bf = homeManager.isFavorite(target.getUniqueId(), b);
+                if (af != bf) return af ? -1 : 1;
+                return a.compareToIgnoreCase(b);
+            });
+        }
 
         // Determine GUI Size
         int guiSize = GUI_SIZE_SMALL;
@@ -157,6 +191,78 @@ public class HomeGUI implements Listener {
             inv.setItem(0, createItem);
         }
 
+        // Slot 2: Search Button
+        ItemStack searchItem = new ItemStack(Material.COMPASS);
+        ItemMeta searchMeta = searchItem.getItemMeta();
+        if (searchMeta != null) {
+            searchMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.search-button.name", "&a検索")));
+            List<String> lore = new ArrayList<>();
+            List<String> configLore = plugin.getConfig().getStringList("gui.search-button.lore");
+            if (configLore.isEmpty()) {
+                configLore = new ArrayList<>();
+                configLore.add("&7クリックして検索文字を入力");
+                configLore.add("&7'clear' で解除");
+            }
+            for (String line : configLore) {
+                lore.add(ChatColor.translateAlternateColorCodes('&', line));
+            }
+            String active = searchQuery.get(viewer.getUniqueId());
+            if (active != null && !active.isEmpty()) {
+                lore.add(ChatColor.YELLOW + "検索: " + active);
+            }
+            searchMeta.setLore(lore);
+            searchItem.setItemMeta(searchMeta);
+        }
+        inv.setItem(2, searchItem);
+
+        // Slot 3: Favorite Mode Button - Only for Owner
+        if (isOwner) {
+            ItemStack favItem = new ItemStack(favoriteMode ? Material.NETHER_STAR : Material.FIREWORK_STAR);
+            ItemMeta favMeta = favItem.getItemMeta();
+            if (favMeta != null) {
+                String nameKey = favoriteMode ? "gui.favorite-button.name-on" : "gui.favorite-button.name-off";
+                String defaultName = favoriteMode ? "&eお気に入りモード: ON" : "&aお気に入りモード: OFF";
+                favMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString(nameKey, defaultName)));
+                List<String> lore = new ArrayList<>();
+                String loreKey = favoriteMode ? "gui.favorite-button.lore-on" : "gui.favorite-button.lore-off";
+                List<String> configLore = plugin.getConfig().getStringList(loreKey);
+                if (configLore.isEmpty()) {
+                    configLore = new ArrayList<>();
+                    configLore.add(favoriteMode ? "&7クリックしてOFFにする" : "&7クリックしてONにする");
+                }
+                for (String line : configLore) {
+                    lore.add(ChatColor.translateAlternateColorCodes('&', line));
+                }
+                favMeta.setLore(lore);
+                favItem.setItemMeta(favMeta);
+            }
+            inv.setItem(3, favItem);
+        }
+
+        // Slot 4: Memo Mode Button - Only for Owner
+        if (isOwner) {
+            ItemStack memoItem = new ItemStack(memoMode ? Material.WRITABLE_BOOK : Material.BOOK);
+            ItemMeta memoMeta = memoItem.getItemMeta();
+            if (memoMeta != null) {
+                String nameKey = memoMode ? "gui.memo-button.name-on" : "gui.memo-button.name-off";
+                String defaultName = memoMode ? "&eメモ編集モード: ON" : "&aメモ編集モード: OFF";
+                memoMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString(nameKey, defaultName)));
+                List<String> lore = new ArrayList<>();
+                String loreKey = memoMode ? "gui.memo-button.lore-on" : "gui.memo-button.lore-off";
+                List<String> configLore = plugin.getConfig().getStringList(loreKey);
+                if (configLore.isEmpty()) {
+                    configLore = new ArrayList<>();
+                    configLore.add(memoMode ? "&7クリックしてOFFにする" : "&7クリックしてONにする");
+                }
+                for (String line : configLore) {
+                    lore.add(ChatColor.translateAlternateColorCodes('&', line));
+                }
+                memoMeta.setLore(lore);
+                memoItem.setItemMeta(memoMeta);
+            }
+            inv.setItem(4, memoItem);
+        }
+
         // Slot 8: Delete Mode Button (Top Right) - Only for Owner or Admin
         if (isOwner || isAdmin) {
             ItemStack deleteItem;
@@ -187,7 +293,7 @@ public class HomeGUI implements Listener {
             ItemStack renameItem;
             if (renameMode) {
                 renameItem = new ItemStack(Material.NAME_TAG);
-                renameItem.addUnsafeEnchantment(Enchantment.DURABILITY, 1);
+                renameItem.addUnsafeEnchantment(Enchantment.UNBREAKING, 1);
             } else {
                 renameItem = new ItemStack(Material.NAME_TAG);
             }
@@ -352,6 +458,15 @@ public class HomeGUI implements Listener {
                     } else {
                         lore.add(ChatColor.RED + "非公開");
                     }
+
+                if (isOwner && homeManager.isFavorite(target.getUniqueId(), homeName)) {
+                    lore.add(ChatColor.GOLD + "★ お気に入り");
+                }
+
+                String memo = homeManager.getMemo(target.getUniqueId(), homeName);
+                if (memo != null && !memo.isEmpty()) {
+                    lore.add(ChatColor.GRAY + "メモ: " + memo);
+                }
                     
                     // Add action specific lore
                     List<String> actionLore = new ArrayList<>(); // Initialize empty
@@ -361,6 +476,10 @@ public class HomeGUI implements Listener {
                          actionLore.add(ChatColor.YELLOW + "クリックして公開/非公開を切り替え");
                     } else if (renameMode) {
                          actionLore.add(ChatColor.YELLOW + "クリックして名前を変更");
+                    } else if (favoriteMode) {
+                         actionLore.add(ChatColor.YELLOW + "クリックしてお気に入りを切り替え");
+                    } else if (memoMode) {
+                         actionLore.add(ChatColor.YELLOW + "クリックしてメモを編集");
                     } else {
                         actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-teleport");
                         // Show cost if not owner and cost enabled
@@ -411,7 +530,7 @@ public class HomeGUI implements Listener {
         // Check both titles (Normal and Delete Mode) - AND match flexible titles if possible
         String title = event.getView().getTitle();
         // Simple check
-        if (!title.contains("ホーム") && !title.contains("削除") && !title.contains("公開") && !title.contains("リネーム")) {
+        if (!title.contains("ホーム") && !title.contains("削除") && !title.contains("公開") && !title.contains("リネーム") && !title.contains("お気に入り") && !title.contains("メモ")) {
              return;
         }
         // Better: Check if title equals config strings
@@ -419,9 +538,11 @@ public class HomeGUI implements Listener {
         String deleteTitle = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.delete-mode-title", "&c削除モード (クリックで削除)"));
         String publicTitle = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.public-mode-title", "&b公開設定モード (クリックで切替)"));
         String renameTitle = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.rename-mode-title", "&eリネームモード (クリックで名前変更)"));
+        String favoriteTitle = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.favorite-mode-title", "&eお気に入りモード (クリックで切替)"));
+        String memoTitle = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.memo-mode-title", "&eメモ編集モード (クリックで編集)"));
         
         // Allow other titles for Admin view (e.g. "User's Homes")
-        boolean isMyGui = title.equals(normalTitle) || title.equals(deleteTitle) || title.equals(publicTitle) || title.equals(renameTitle) || title.contains("のホーム"); 
+        boolean isMyGui = title.equals(normalTitle) || title.equals(deleteTitle) || title.equals(publicTitle) || title.equals(renameTitle) || title.equals(favoriteTitle) || title.equals(memoTitle) || title.contains("のホーム"); 
         
         if (!isMyGui) return;
 
@@ -496,6 +617,14 @@ public class HomeGUI implements Listener {
             return;
         }
 
+        // Search Button at Slot 2
+        if (slot == 2) {
+            if (inputListener != null) {
+                inputListener.startSearch(viewer);
+            }
+            return;
+        }
+
         // Rename Mode Button at Slot 1
         if (slot == 1 && isOwner) {
             if (renameModePlayers.contains(viewer.getUniqueId())) {
@@ -506,9 +635,45 @@ public class HomeGUI implements Listener {
                 // Disable other modes
                 deleteModePlayers.remove(viewer.getUniqueId());
                 publicModePlayers.remove(viewer.getUniqueId());
+                favoriteModePlayers.remove(viewer.getUniqueId());
+                memoModePlayers.remove(viewer.getUniqueId());
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target); 
+            return;
+        }
+
+        // Favorite Mode Button at Slot 3
+        if (slot == 3 && isOwner) {
+            if (favoriteModePlayers.contains(viewer.getUniqueId())) {
+                favoriteModePlayers.remove(viewer.getUniqueId());
+                soundManager.play(viewer, "gui-click");
+            } else {
+                favoriteModePlayers.add(viewer.getUniqueId());
+                deleteModePlayers.remove(viewer.getUniqueId());
+                publicModePlayers.remove(viewer.getUniqueId());
+                renameModePlayers.remove(viewer.getUniqueId());
+                memoModePlayers.remove(viewer.getUniqueId());
+                soundManager.play(viewer, "gui-click");
+            }
+            open(viewer, target);
+            return;
+        }
+
+        // Memo Mode Button at Slot 4
+        if (slot == 4 && isOwner) {
+            if (memoModePlayers.contains(viewer.getUniqueId())) {
+                memoModePlayers.remove(viewer.getUniqueId());
+                soundManager.play(viewer, "gui-click");
+            } else {
+                memoModePlayers.add(viewer.getUniqueId());
+                deleteModePlayers.remove(viewer.getUniqueId());
+                publicModePlayers.remove(viewer.getUniqueId());
+                renameModePlayers.remove(viewer.getUniqueId());
+                favoriteModePlayers.remove(viewer.getUniqueId());
+                soundManager.play(viewer, "gui-click");
+            }
+            open(viewer, target);
             return;
         }
 
@@ -522,6 +687,8 @@ public class HomeGUI implements Listener {
                 // Disable other modes
                 publicModePlayers.remove(viewer.getUniqueId());
                 renameModePlayers.remove(viewer.getUniqueId());
+                favoriteModePlayers.remove(viewer.getUniqueId());
+                memoModePlayers.remove(viewer.getUniqueId());
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target); 
@@ -538,6 +705,8 @@ public class HomeGUI implements Listener {
                 // Disable other modes
                 deleteModePlayers.remove(viewer.getUniqueId());
                 renameModePlayers.remove(viewer.getUniqueId());
+                favoriteModePlayers.remove(viewer.getUniqueId());
+                memoModePlayers.remove(viewer.getUniqueId());
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target); 
@@ -600,6 +769,16 @@ public class HomeGUI implements Listener {
                         if (inputListener != null) {
                             inputListener.startRename(viewer, homeName);
                         }
+                    } else if (favoriteModePlayers.contains(viewer.getUniqueId()) && isOwner) {
+                        boolean isFav = homeManager.isFavorite(target.getUniqueId(), homeName);
+                        homeManager.setFavorite(target.getUniqueId(), homeName, !isFav);
+                        soundManager.play(viewer, "gui-click");
+                        favoriteModePlayers.remove(viewer.getUniqueId());
+                        open(viewer, target);
+                    } else if (memoModePlayers.contains(viewer.getUniqueId()) && isOwner) {
+                        if (inputListener != null) {
+                            inputListener.startEditMemo(viewer, homeName);
+                        }
                     } else if (publicModePlayers.contains(viewer.getUniqueId()) && isOwner) {
                         // Public Mode Logic
                         boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
@@ -650,7 +829,7 @@ public class HomeGUI implements Listener {
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
         String title = event.getView().getTitle();
-        if (title.contains("ホーム") || title.contains("削除") || title.contains("公開") || title.contains("リネーム")) {
+        if (title.contains("ホーム") || title.contains("削除") || title.contains("公開") || title.contains("リネーム") || title.contains("お気に入り") || title.contains("メモ")) {
             event.setCancelled(true);
         }
     }
@@ -661,6 +840,9 @@ public class HomeGUI implements Listener {
             deleteModePlayers.remove(event.getPlayer().getUniqueId());
             publicModePlayers.remove(event.getPlayer().getUniqueId());
             renameModePlayers.remove(event.getPlayer().getUniqueId());
+            favoriteModePlayers.remove(event.getPlayer().getUniqueId());
+            memoModePlayers.remove(event.getPlayer().getUniqueId());
+            searchQuery.remove(event.getPlayer().getUniqueId());
             
             // Clear pagination data
             currentStartIndex.remove(event.getPlayer().getUniqueId());

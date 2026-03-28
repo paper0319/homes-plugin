@@ -23,6 +23,12 @@ public class HomeManager {
     // Cache: UUID -> (HomeName -> Boolean) - Public Status
     private final Map<UUID, Map<String, Boolean>> publicCache = new ConcurrentHashMap<>();
 
+    // Cache: UUID -> (HomeName -> Boolean) - Favorite
+    private final Map<UUID, Map<String, Boolean>> favoriteCache = new ConcurrentHashMap<>();
+
+    // Cache: UUID -> (HomeName -> String) - Memo
+    private final Map<UUID, Map<String, String>> memoCache = new ConcurrentHashMap<>();
+
     public HomeManager(HomesPlugin plugin) {
         this.plugin = plugin;
         setup();
@@ -49,6 +55,12 @@ public class HomeManager {
                 // Bulk fetch public status to avoid N+1 queries
                 Map<String, Boolean> publicStatus = databaseManager.getHomePublicStatus(uuid);
                 publicCache.put(uuid, new ConcurrentHashMap<>(publicStatus));
+
+                Map<String, Boolean> favoriteStatus = databaseManager.getHomeFavoriteStatus(uuid);
+                favoriteCache.put(uuid, new ConcurrentHashMap<>(favoriteStatus));
+
+                Map<String, String> memos = databaseManager.getHomeMemos(uuid);
+                memoCache.put(uuid, new ConcurrentHashMap<>(memos));
             }
         }.runTaskAsynchronously(plugin);
     }
@@ -57,6 +69,8 @@ public class HomeManager {
     public void unloadHomes(UUID uuid) {
         homeCache.remove(uuid);
         publicCache.remove(uuid);
+        favoriteCache.remove(uuid);
+        memoCache.remove(uuid);
     }
     
     // Async set home
@@ -68,6 +82,8 @@ public class HomeManager {
         // Update cache immediately for responsiveness
         // Use ConcurrentHashMap for thread safety
         homeCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).put(name, loc);
+        publicCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).putIfAbsent(name, false);
+        favoriteCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).putIfAbsent(name, false);
         
         // Save to DB asynchronously
         new BukkitRunnable() {
@@ -104,6 +120,20 @@ public class HomeManager {
                 status.put(newName, isPublic);
             }
         }
+        if (favoriteCache.containsKey(uuid)) {
+            Map<String, Boolean> status = favoriteCache.get(uuid);
+            if (status.containsKey(oldName)) {
+                Boolean isFavorite = status.remove(oldName);
+                status.put(newName, isFavorite);
+            }
+        }
+        if (memoCache.containsKey(uuid)) {
+            Map<String, String> memos = memoCache.get(uuid);
+            if (memos.containsKey(oldName)) {
+                String memo = memos.remove(oldName);
+                memos.put(newName, memo);
+            }
+        }
         
         // Update DB
         new BukkitRunnable() {
@@ -120,6 +150,47 @@ public class HomeManager {
         }
         return databaseManager.isPublic(uuid, name);
     }
+
+    public boolean isFavorite(UUID uuid, String name) {
+        Map<String, Boolean> status = favoriteCache.get(uuid);
+        if (status == null) {
+            status = new ConcurrentHashMap<>(databaseManager.getHomeFavoriteStatus(uuid));
+            favoriteCache.put(uuid, status);
+        }
+        Boolean value = status.get(name);
+        return value != null && value;
+    }
+
+    public void setFavorite(UUID uuid, String name, boolean isFavorite) {
+        favoriteCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).put(name, isFavorite);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                databaseManager.updateFavorite(uuid, name, isFavorite);
+            }
+        }.runTaskAsynchronously(plugin);
+    }
+
+    public String getMemo(UUID uuid, String name) {
+        if (memoCache.containsKey(uuid)) {
+            return memoCache.get(uuid).get(name);
+        }
+        return null;
+    }
+
+    public void setMemo(UUID uuid, String name, String memo) {
+        if (memo == null || memo.isEmpty()) {
+            memoCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).remove(name);
+        } else {
+            memoCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).put(name, memo);
+        }
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                databaseManager.updateMemo(uuid, name, memo);
+            }
+        }.runTaskAsynchronously(plugin);
+    }
     
     // Async delete home
     public void deleteHome(UUID uuid, String name) {
@@ -129,6 +200,12 @@ public class HomeManager {
         }
         if (publicCache.containsKey(uuid)) {
             publicCache.get(uuid).remove(name);
+        }
+        if (favoriteCache.containsKey(uuid)) {
+            favoriteCache.get(uuid).remove(name);
+        }
+        if (memoCache.containsKey(uuid)) {
+            memoCache.get(uuid).remove(name);
         }
         
         // Delete from DB asynchronously
@@ -206,6 +283,8 @@ public class HomeManager {
         // But for other settings, we can just clear cache and re-fetch for online players
         homeCache.clear();
         publicCache.clear();
+        favoriteCache.clear();
+        memoCache.clear();
         for (Player p : plugin.getServer().getOnlinePlayers()) {
             loadHomes(p.getUniqueId());
         }

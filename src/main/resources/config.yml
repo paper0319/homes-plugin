@@ -5,6 +5,7 @@ settings:
   op-home-limit: 100
   max-home-name-length: 32
   home-name-regex: '^[^\s:\u00A7]+$'
+  max-home-memo-length: 15
   teleport-delay: 3
   safe-teleport:
     search-radius: 2
@@ -48,6 +49,8 @@ gui:
   delete-mode-title: "&c削除モード (クリックで削除)"
   public-mode-title: "&b公開設定モード (クリックで切替)"
   rename-mode-title: "&eリネームモード (クリックで名前変更)"
+  favorite-mode-title: "&eお気に入りモード (クリックで切替)"
+  memo-mode-title: "&eメモ編集モード (クリックで編集)"
   create-button:
     name: "&aホームを作成する"
     lore:
@@ -76,6 +79,27 @@ gui:
     lore-on:
       - "&7クリックしてOFFにする"
       - "&bホームをクリックすると公開/非公開を切り替えます"
+  search-button:
+    name: "&a検索"
+    lore:
+      - "&7クリックして検索文字を入力"
+      - "&7'clear' で解除"
+  favorite-button:
+    name-off: "&aお気に入りモード: OFF"
+    name-on: "&eお気に入りモード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&eホームをクリックするとお気に入りを切り替えます"
+  memo-button:
+    name-off: "&aメモ編集モード: OFF"
+    name-on: "&eメモ編集モード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&eホームをクリックするとメモを編集できます"
   home-icon:
     name: "&b{name}"
     default-material: LIGHT_BLUE_BED
@@ -150,6 +174,13 @@ messages:
   back-feature-disabled: "&c/back コマンドは無効化されています。"
   reload-success: "&a設定をリロードしました。"
   enter-name: "&aホームの名前を入力してください。"
+  enter-search: "&a検索する文字を入力してください。(clearで解除)"
+  search-cancelled: "&e検索をキャンセルしました。"
+  enter-memo: "&a{name} のメモを入力してください。(clearで削除)"
+  memo-updated: "&a{name} のメモを更新しました。"
+  memo-cleared: "&e{name} のメモを削除しました。"
+  memo-cancelled: "&eメモ編集をキャンセルしました。"
+  memo-too-long: "&cメモが長すぎます。(最大: {max})"
   cancel-info: "&7キャンセルするには &c'cancel' &7と入力してください。"
   home-renamed: "&aホーム名を {old} から {new} に変更しました。"
   rename-cancelled: "&eリネームをキャンセルしました。"

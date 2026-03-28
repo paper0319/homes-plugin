@@ -4,6 +4,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +22,10 @@ public class DatabaseManager {
     private final HomesPlugin plugin;
     private HikariDataSource dataSource;
     private HikariConfig config;
+
+    private interface MemoColumnDialect {
+        String alterMemoColumnSql(int length);
+    }
 
     public DatabaseManager(HomesPlugin plugin) {
         this.plugin = plugin;
@@ -115,22 +120,99 @@ public class DatabaseManager {
         String indexSql = "CREATE INDEX IF NOT EXISTS idx_player_uuid ON player_homes(player_uuid);";
 
         try (Connection conn = dataSource.getConnection()) {
-            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                stmt.executeUpdate();
-            }
-            try (PreparedStatement stmt = conn.prepareStatement(indexSql)) {
-                stmt.executeUpdate();
+            boolean previousAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.executeUpdate();
+                }
+                try (PreparedStatement stmt = conn.prepareStatement(indexSql)) {
+                    stmt.executeUpdate();
+                }
+
+                addColumnIfNotExists(conn, "is_favorite", "BOOLEAN NOT NULL DEFAULT FALSE");
+                int desiredMemoLen = plugin.getConfig().getInt("settings.max-home-memo-length", 15);
+                if (desiredMemoLen < 1) desiredMemoLen = 1;
+                if (desiredMemoLen > 128) desiredMemoLen = 128;
+                addColumnIfNotExists(conn, "memo", "VARCHAR(" + desiredMemoLen + ")");
+                ensureMemoColumnLength(conn, desiredMemoLen);
+
+                conn.commit();
+            } catch (SQLException e) {
+                SQLException txEx = new SQLException("Transaction failed", e);
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    plugin.getLogger().warning("Rollback failed: " + rollbackEx.getMessage());
+                    txEx.addSuppressed(rollbackEx);
+                }
+                throw txEx;
+            } finally {
+                conn.setAutoCommit(previousAutoCommit);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().severe("Database initialization failed: " + e.getMessage());
+            throw new RuntimeException(e);
         }
     }
 
-    private void addColumnIfNotExists(String columnName, String columnDef) {
-        try (Connection conn = dataSource.getConnection()) {
-            boolean columnExists = false;
-            // Check if column exists using MetaData is most reliable across DB types
-            try (ResultSet rs = conn.getMetaData().getColumns(null, null, "PLAYER_HOMES", null)) {
+    private void ensureMemoColumnLength(Connection conn, int desiredMemoLen) throws SQLException {
+        try (ResultSet rs = conn.getMetaData().getColumns(null, null, "PLAYER_HOMES", "memo")) {
+            Integer size = null;
+            if (rs.next()) {
+                size = rs.getInt("COLUMN_SIZE");
+            }
+            if (size == null || size <= 0) {
+                try (ResultSet rs2 = conn.getMetaData().getColumns(null, null, "player_homes", "memo")) {
+                    if (rs2.next()) {
+                        size = rs2.getInt("COLUMN_SIZE");
+                    }
+                }
+            }
+            if (size == null || size <= 0 || size == desiredMemoLen) {
+                return;
+            }
+
+            String type = plugin.getConfig().getString("database.type", "h2").toLowerCase();
+            MemoColumnDialect dialect = memoColumnDialect(type);
+            if (dialect == null) {
+                plugin.getLogger().warning("Skipping memo column length adjust for database type: " + type);
+                return;
+            }
+            String alterSql = dialect.alterMemoColumnSql(desiredMemoLen);
+
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(alterSql);
+            }
+        }
+    }
+
+    private MemoColumnDialect memoColumnDialect(String type) {
+        if (type == null) return null;
+        switch (type) {
+            case "mysql":
+            case "mariadb":
+                return length -> "ALTER TABLE player_homes MODIFY memo VARCHAR(" + length + ")";
+            case "h2":
+                return length -> "ALTER TABLE player_homes ALTER COLUMN memo VARCHAR(" + length + ")";
+            default:
+                return null;
+        }
+    }
+
+    private void addColumnIfNotExists(Connection conn, String columnName, String columnDef) throws SQLException {
+        boolean columnExists = false;
+        try (ResultSet rs = conn.getMetaData().getColumns(null, null, "PLAYER_HOMES", null)) {
+            while (rs.next()) {
+                if (columnName.equalsIgnoreCase(rs.getString("COLUMN_NAME"))) {
+                    columnExists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!columnExists) {
+            try (ResultSet rs = conn.getMetaData().getColumns(null, null, "player_homes", null)) {
                 while (rs.next()) {
                     if (columnName.equalsIgnoreCase(rs.getString("COLUMN_NAME"))) {
                         columnExists = true;
@@ -138,27 +220,13 @@ public class DatabaseManager {
                     }
                 }
             }
-            
-            // If checking "PLAYER_HOMES" (uppercase) failed, try lowercase "player_homes" just in case
-            if (!columnExists) {
-                 try (ResultSet rs = conn.getMetaData().getColumns(null, null, "player_homes", null)) {
-                    while (rs.next()) {
-                        if (columnName.equalsIgnoreCase(rs.getString("COLUMN_NAME"))) {
-                            columnExists = true;
-                            break;
-                        }
-                    }
-                }
-            }
+        }
 
-            if (!columnExists) {
-                String sql = "ALTER TABLE player_homes ADD COLUMN " + columnName + " " + columnDef;
-                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                    stmt.executeUpdate();
-                }
+        if (!columnExists) {
+            String sql = "ALTER TABLE player_homes ADD COLUMN " + columnName + " " + columnDef;
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.executeUpdate();
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
         }
     }
 
@@ -214,6 +282,32 @@ public class DatabaseManager {
             stmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void updateFavorite(UUID uuid, String name, boolean isFavorite) {
+        String sql = "UPDATE player_homes SET is_favorite = ? WHERE player_uuid = ? AND home_name = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setBoolean(1, isFavorite);
+            stmt.setString(2, uuid.toString());
+            stmt.setString(3, name);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Failed to update favorite: " + e.getMessage());
+        }
+    }
+
+    public void updateMemo(UUID uuid, String name, String memo) {
+        String sql = "UPDATE player_homes SET memo = ? WHERE player_uuid = ? AND home_name = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, memo);
+            stmt.setString(2, uuid.toString());
+            stmt.setString(3, name);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().severe("Failed to update memo: " + e.getMessage());
         }
     }
 
@@ -303,6 +397,45 @@ public class DatabaseManager {
             e.printStackTrace();
         }
         return status;
+    }
+
+    public Map<String, Boolean> getHomeFavoriteStatus(UUID uuid) {
+        Map<String, Boolean> status = new HashMap<>();
+        String sql = "SELECT home_name, is_favorite FROM player_homes WHERE player_uuid = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, uuid.toString());
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    status.put(rs.getString("home_name"), rs.getBoolean("is_favorite"));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return status;
+    }
+
+    public Map<String, String> getHomeMemos(UUID uuid) {
+        Map<String, String> memos = new HashMap<>();
+        String sql = "SELECT home_name, memo FROM player_homes WHERE player_uuid = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, uuid.toString());
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    String memo = rs.getString("memo");
+                    if (memo != null && !memo.isEmpty()) {
+                        memos.put(rs.getString("home_name"), memo);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return memos;
     }
 
     public Map<String, Location> getHomes(UUID uuid) {
