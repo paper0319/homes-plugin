@@ -1,6 +1,7 @@
 package com.example.homes.manager;
 
-import org.bukkit.ChatColor;
+import java.time.Duration;
+
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -11,6 +12,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.title.Title;
 
 public class TeleportManager {
 
@@ -77,7 +82,11 @@ public class TeleportManager {
                     }
                     this.cancel();
                 } else {
-                    player.sendTitle(ChatColor.GREEN + String.valueOf(timeLeft), "", 0, 20, 0);
+                    player.showTitle(Title.title(
+                            Component.text(String.valueOf(timeLeft), NamedTextColor.GREEN),
+                            Component.empty(),
+                            Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO)
+                    ));
                     soundManager.play(player, "teleport-count");
                     timeLeft--;
                 }
@@ -86,18 +95,17 @@ public class TeleportManager {
     }
     
     private boolean doTeleport(Player player, Object target) {
-        if (target instanceof Player) {
-            Player targetPlayer = (Player) target;
+        if (target instanceof Player targetPlayer) {
             if (targetPlayer.isOnline()) {
                 player.teleport(targetPlayer.getLocation());
                 playTeleportEffect(player);
                 return true;
             } else {
-                player.sendMessage(ChatColor.RED + "テレポート先が見つかりません。");
+                player.sendMessage(Component.text("テレポート先が見つかりません。", NamedTextColor.RED));
                 return false;
             }
-        } else if (target instanceof Location) {
-            Location safe = findSafeLocation((Location) target);
+        } else if (target instanceof Location targetLocation) {
+            Location safe = findSafeLocation(targetLocation);
             if (safe == null) {
                 player.sendMessage(plugin.getMessage("teleport-unsafe"));
                 soundManager.play(player, "teleport-fail");

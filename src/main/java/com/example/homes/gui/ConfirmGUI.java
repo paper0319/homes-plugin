@@ -2,14 +2,16 @@ package com.example.homes.gui;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -17,7 +19,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import com.example.homes.HomesPlugin;
 import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.SoundManager;
-import java.util.UUID;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class ConfirmGUI implements Listener {
 
@@ -27,6 +32,9 @@ public class ConfirmGUI implements Listener {
     private final String targetHome;
     private final UUID targetUUID;
     private final SoundManager soundManager;
+    private boolean registered;
+    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
+    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     public ConfirmGUI(HomesPlugin plugin, HomeManager homeManager, HomeGUI homeGUI, String targetHome, SoundManager soundManager, UUID targetUUID) {
         this.plugin = plugin;
@@ -35,7 +43,6 @@ public class ConfirmGUI implements Listener {
         this.targetHome = targetHome;
         this.soundManager = soundManager;
         this.targetUUID = targetUUID;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
     
     public ConfirmGUI(HomesPlugin plugin, HomeManager homeManager, HomeGUI homeGUI, String targetHome, SoundManager soundManager) {
@@ -43,19 +50,19 @@ public class ConfirmGUI implements Listener {
     }
 
     public void open(Player player) {
-        String title = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.confirm-delete.title", "&c本当に削除しますか？"));
+        if (!registered) {
+            plugin.getServer().getPluginManager().registerEvents(this, plugin);
+            registered = true;
+        }
+        Component title = colorize(plugin.getConfig().getString("gui.confirm-delete.title", "&c本当に削除しますか？"));
         Inventory inv = Bukkit.createInventory(null, 27, title);
 
         // Yes Button (Slot 11)
         ItemStack yesItem = new ItemStack(Material.LIME_WOOL);
         ItemMeta yesMeta = yesItem.getItemMeta();
         if (yesMeta != null) {
-            yesMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.confirm-delete.yes-button.name", "&aはい、削除します")));
-            List<String> lore = new ArrayList<>();
-            for (String line : plugin.getConfig().getStringList("gui.confirm-delete.yes-button.lore")) {
-                lore.add(ChatColor.translateAlternateColorCodes('&', line));
-            }
-            yesMeta.setLore(lore);
+            yesMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-delete.yes-button.name", "&aはい、削除します")));
+            yesMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-delete.yes-button.lore")));
             yesItem.setItemMeta(yesMeta);
         }
         inv.setItem(11, yesItem);
@@ -64,12 +71,8 @@ public class ConfirmGUI implements Listener {
         ItemStack noItem = new ItemStack(Material.RED_WOOL);
         ItemMeta noMeta = noItem.getItemMeta();
         if (noMeta != null) {
-            noMeta.setDisplayName(ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.confirm-delete.no-button.name", "&cいいえ、キャンセルします")));
-            List<String> lore = new ArrayList<>();
-            for (String line : plugin.getConfig().getStringList("gui.confirm-delete.no-button.lore")) {
-                lore.add(ChatColor.translateAlternateColorCodes('&', line));
-            }
-            noMeta.setLore(lore);
+            noMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-delete.no-button.name", "&cいいえ、キャンセルします")));
+            noMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-delete.no-button.lore")));
             noItem.setItemMeta(noMeta);
         }
         inv.setItem(15, noItem);
@@ -78,7 +81,7 @@ public class ConfirmGUI implements Listener {
         ItemStack infoItem = new ItemStack(Material.PAPER);
         ItemMeta infoMeta = infoItem.getItemMeta();
         if (infoMeta != null) {
-            infoMeta.setDisplayName(ChatColor.YELLOW + "削除対象: " + ChatColor.GOLD + targetHome);
+            infoMeta.displayName(colorize("&e削除対象: &6" + targetHome));
             infoItem.setItemMeta(infoMeta);
         }
         inv.setItem(13, infoItem);
@@ -88,14 +91,15 @@ public class ConfirmGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        String title = ChatColor.translateAlternateColorCodes('&', plugin.getConfig().getString("gui.confirm-delete.title", "&c本当に削除しますか？"));
-        if (!event.getView().getTitle().equals(title)) {
+        Component title = colorize(plugin.getConfig().getString("gui.confirm-delete.title", "&c本当に削除しますか？"));
+        if (!PLAIN.serialize(event.getView().title()).equals(PLAIN.serialize(title))) {
             return;
         }
 
         event.setCancelled(true);
 
-        if (event.getCurrentItem() == null || event.getCurrentItem().getType() == Material.AIR) {
+        ItemStack current = event.getCurrentItem();
+        if (current == null || current.getType() == Material.AIR) {
             return;
         }
 
@@ -110,7 +114,8 @@ public class ConfirmGUI implements Listener {
             soundManager.play(player, "delete-success");
             
             // Unregister listener and return to HomeGUI
-            InventoryClickEvent.getHandlerList().unregister(this);
+            HandlerList.unregisterAll(this);
+            registered = false;
             // Re-open target's GUI
             Player target = Bukkit.getPlayer(uuid);
             if (target != null) {
@@ -125,7 +130,8 @@ public class ConfirmGUI implements Listener {
             soundManager.play(player, "gui-click");
             
             // Unregister listener and return to HomeGUI
-            InventoryClickEvent.getHandlerList().unregister(this);
+            HandlerList.unregisterAll(this);
+            registered = false;
              // Re-open target's GUI
             UUID uuid = targetUUID != null ? targetUUID : player.getUniqueId();
             Player target = Bukkit.getPlayer(uuid);
@@ -135,5 +141,30 @@ public class ConfirmGUI implements Listener {
                 homeGUI.open(player); // Fallback
             }
         }
+    }
+
+    @EventHandler
+    public void onClose(InventoryCloseEvent event) {
+        if (event.getReason() == InventoryCloseEvent.Reason.OPEN_NEW) return;
+        Component title = colorize(plugin.getConfig().getString("gui.confirm-delete.title", "&c本当に削除しますか？"));
+        if (!PLAIN.serialize(event.getView().title()).equals(PLAIN.serialize(title))) {
+            return;
+        }
+        HandlerList.unregisterAll(this);
+        registered = false;
+    }
+
+    private Component colorize(String text) {
+        if (text == null) return Component.empty();
+        return LEGACY_AMPERSAND.deserialize(text);
+    }
+
+    private List<Component> colorizeLore(List<String> lines) {
+        if (lines == null || lines.isEmpty()) return null;
+        List<Component> out = new ArrayList<>(lines.size());
+        for (String line : lines) {
+            out.add(colorize(line));
+        }
+        return out;
     }
 }

@@ -2,6 +2,7 @@ package com.example.homes.manager;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -13,10 +14,11 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
 
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
-import net.md_5.bungee.api.chat.HoverEvent;
-import net.md_5.bungee.api.chat.TextComponent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 public class TpaManager {
 
@@ -90,7 +92,6 @@ public class TpaManager {
 
         sender.sendMessage(plugin.getMessage("tpa-sent").replace("{player}", receiver.getName()));
         
-        String typeMsg = type == RequestType.TPA ? "テレポート" : "カモン(呼び出し)";
         if (type == RequestType.TPAHERE) {
              receiver.sendMessage(plugin.getMessage("tpahere-received").replace("{player}", sender.getName()));
         } else {
@@ -98,21 +99,17 @@ public class TpaManager {
         }
         
         // Clickable messages
-        TextComponent accept = new TextComponent("【承認】");
-        accept.setColor(net.md_5.bungee.api.ChatColor.GREEN);
-        accept.setBold(true);
-        accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/tpaccept"));
-        accept.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder("クリックして承認").create()));
-        
-        TextComponent space = new TextComponent("  ");
-        
-        TextComponent deny = new TextComponent("【拒否】");
-        deny.setColor(net.md_5.bungee.api.ChatColor.RED);
-        deny.setBold(true);
-        deny.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/tpdeny"));
-        deny.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new ComponentBuilder("クリックして拒否").create()));
-        
-        receiver.spigot().sendMessage(accept, space, deny);
+        Component accept = Component.text("【承認】", NamedTextColor.GREEN)
+                .decorate(TextDecoration.BOLD)
+                .clickEvent(ClickEvent.runCommand("/tpaccept"))
+                .hoverEvent(HoverEvent.showText(Component.text("クリックして承認")));
+
+        Component deny = Component.text("【拒否】", NamedTextColor.RED)
+                .decorate(TextDecoration.BOLD)
+                .clickEvent(ClickEvent.runCommand("/tpdeny"))
+                .hoverEvent(HoverEvent.showText(Component.text("クリックして拒否")));
+
+        receiver.sendMessage(accept.append(Component.text("  ")).append(deny));
         receiver.sendMessage(plugin.getMessage("tpa-info")); // Keep old info message as fallback/hint
         
         // Expire after 60 seconds
@@ -257,6 +254,22 @@ public class TpaManager {
         }
     }
     
+    public void clearPlayerState(UUID uuid) {
+        lastLocations.remove(uuid);
+        tpaDisabled.remove(uuid);
+        ignoredPlayers.remove(uuid);
+        cooldowns.remove(uuid);
+        requests.remove(uuid);
+        for (Iterator<Map.Entry<UUID, Map<UUID, TpaRequest>>> it = requests.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, Map<UUID, TpaRequest>> e = it.next();
+            Map<UUID, TpaRequest> pending = e.getValue();
+            pending.remove(uuid);
+            if (pending.isEmpty()) {
+                it.remove();
+            }
+        }
+    }
+
     public boolean isIgnored(UUID receiver, UUID sender) {
         return ignoredPlayers.containsKey(receiver) && ignoredPlayers.get(receiver).contains(sender);
     }

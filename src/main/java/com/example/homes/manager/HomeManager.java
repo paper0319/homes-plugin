@@ -1,11 +1,13 @@
 package com.example.homes.manager;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -49,18 +51,28 @@ public class HomeManager {
         new BukkitRunnable() {
             @Override
             public void run() {
-                Map<String, Location> homes = databaseManager.getHomes(uuid);
-                homeCache.put(uuid, new ConcurrentHashMap<>(homes));
-                
-                // Bulk fetch public status to avoid N+1 queries
+                Map<String, com.example.homes.database.DatabaseManager.HomeData> homeData = databaseManager.getHomesData(uuid);
                 Map<String, Boolean> publicStatus = databaseManager.getHomePublicStatus(uuid);
-                publicCache.put(uuid, new ConcurrentHashMap<>(publicStatus));
-
                 Map<String, Boolean> favoriteStatus = databaseManager.getHomeFavoriteStatus(uuid);
-                favoriteCache.put(uuid, new ConcurrentHashMap<>(favoriteStatus));
-
                 Map<String, String> memos = databaseManager.getHomeMemos(uuid);
-                memoCache.put(uuid, new ConcurrentHashMap<>(memos));
+
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    Map<String, Location> homes = new HashMap<>();
+                    for (Map.Entry<String, com.example.homes.database.DatabaseManager.HomeData> e : homeData.entrySet()) {
+                        com.example.homes.database.DatabaseManager.HomeData d = e.getValue();
+                        World world = plugin.getServer().getWorld(d.worldName);
+                        if (world == null) {
+                            plugin.getLogger().warning("World '" + d.worldName + "' not found for home '" + e.getKey() + "' of player " + uuid);
+                            continue;
+                        }
+                        homes.put(e.getKey(), new Location(world, d.x, d.y, d.z, d.yaw, d.pitch));
+                    }
+
+                    homeCache.put(uuid, new ConcurrentHashMap<>(homes));
+                    publicCache.put(uuid, new ConcurrentHashMap<>(publicStatus));
+                    favoriteCache.put(uuid, new ConcurrentHashMap<>(favoriteStatus));
+                    memoCache.put(uuid, new ConcurrentHashMap<>(memos));
+                });
             }
         }.runTaskAsynchronously(plugin);
     }
@@ -79,17 +91,28 @@ public class HomeManager {
     }
     
     public void setHomeDirectly(UUID uuid, String name, Location loc) {
+        if (loc == null || loc.getWorld() == null) {
+            plugin.getLogger().warning("Failed to set home: location/world is null");
+            return;
+        }
         // Update cache immediately for responsiveness
         // Use ConcurrentHashMap for thread safety
         homeCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).put(name, loc);
         publicCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).putIfAbsent(name, false);
         favoriteCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).putIfAbsent(name, false);
         
+        String worldName = loc.getWorld().getName();
+        double x = loc.getX();
+        double y = loc.getY();
+        double z = loc.getZ();
+        float yaw = loc.getYaw();
+        float pitch = loc.getPitch();
+
         // Save to DB asynchronously
         new BukkitRunnable() {
             @Override
             public void run() {
-                databaseManager.setHome(uuid, name, loc, false); // Default false
+                databaseManager.setHome(uuid, name, worldName, x, y, z, yaw, pitch, false); // Default false
             }
         }.runTaskAsynchronously(plugin);
     }

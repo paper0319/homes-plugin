@@ -1,8 +1,11 @@
 package com.example.homes.manager;
 
-import com.example.homes.HomesPlugin;
-import net.milkbowl.vault.economy.Economy;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
+
+import com.example.homes.HomesPlugin;
+
+import net.milkbowl.vault.economy.Economy;
 
 public class EconomyManager {
 
@@ -30,14 +33,16 @@ public class EconomyManager {
         return economy != null;
     }
 
-    public boolean hasMoney(String playerName, double amount) {
+    public boolean hasMoney(OfflinePlayer player, double amount) {
         if (!hasEconomy()) return true; // Free if no economy
-        return economy.has(playerName, amount);
+        if (player == null) return true;
+        return economy.has(player, amount);
     }
 
-    public void withdraw(String playerName, double amount) {
+    public void withdraw(OfflinePlayer player, double amount) {
         if (!hasEconomy()) return;
-        economy.withdrawPlayer(playerName, amount);
+        if (player == null) return;
+        economy.withdrawPlayer(player, amount);
     }
     
     public String format(double amount) {

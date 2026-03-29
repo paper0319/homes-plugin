@@ -1,9 +1,15 @@
 package com.example.homes.manager;
 
-import com.example.homes.HomesPlugin;
+import java.util.Locale;
+import java.util.logging.Level;
+
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+
+import com.example.homes.HomesPlugin;
 
 public class SoundManager {
 
@@ -23,12 +29,12 @@ public class SoundManager {
             return;
         }
 
-        try {
-            Sound sound = Sound.valueOf(soundName.toUpperCase());
-            player.playSound(player.getLocation(), sound, volume, pitch);
-        } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("Invalid sound name in config: " + soundName);
+        Sound sound = resolveSound(soundName);
+        if (sound == null) {
+            plugin.getLogger().log(Level.WARNING, "Invalid sound name in config: {0}", soundName);
+            return;
         }
+        player.playSound(player.getLocation(), sound, volume, pitch);
     }
     
     public void playAtLocation(Location loc, String key, float volume, float pitch) {
@@ -37,13 +43,30 @@ public class SoundManager {
             return;
         }
 
-        try {
-            Sound sound = Sound.valueOf(soundName.toUpperCase());
-            if (loc.getWorld() != null) {
-                loc.getWorld().playSound(loc, sound, volume, pitch);
-            }
-        } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("Invalid sound name in config: " + soundName);
+        Sound sound = resolveSound(soundName);
+        if (sound == null) {
+            plugin.getLogger().log(Level.WARNING, "Invalid sound name in config: {0}", soundName);
+            return;
         }
+        if (loc.getWorld() != null) {
+            loc.getWorld().playSound(loc, sound, volume, pitch);
+        }
+    }
+
+    private Sound resolveSound(String raw) {
+        if (raw == null) return null;
+        String normalized = raw.trim();
+        if (normalized.isEmpty()) return null;
+
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        NamespacedKey key = NamespacedKey.fromString(lower);
+        if (key != null) {
+            Sound sound = Registry.SOUNDS.get(key);
+            if (sound != null) return sound;
+        }
+
+        String minecraftKey = lower.contains(":") ? lower : lower.replace('_', '.');
+        Sound sound = Registry.SOUNDS.get(NamespacedKey.minecraft(minecraftKey.replace("minecraft:", "")));
+        return sound;
     }
 }

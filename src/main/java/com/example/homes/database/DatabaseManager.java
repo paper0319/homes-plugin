@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 import org.bukkit.Location;
 
@@ -23,6 +24,24 @@ public class DatabaseManager {
     private HikariDataSource dataSource;
     private HikariConfig config;
 
+    public static final class HomeData {
+        public final String worldName;
+        public final double x;
+        public final double y;
+        public final double z;
+        public final float yaw;
+        public final float pitch;
+
+        public HomeData(String worldName, double x, double y, double z, float yaw, float pitch) {
+            this.worldName = worldName;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.yaw = yaw;
+            this.pitch = pitch;
+        }
+    }
+
     private interface MemoColumnDialect {
         String alterMemoColumnSql(int length);
     }
@@ -33,9 +52,17 @@ public class DatabaseManager {
         createTable();
     }
 
+    private String databaseTypeLower() {
+        String type = plugin.getConfig().getString("database.type");
+        if (type == null || type.isBlank()) {
+            return "h2";
+        }
+        return type.toLowerCase();
+    }
+
     private void setupDataSource() {
         config = new HikariConfig();
-        String type = plugin.getConfig().getString("database.type", "h2").toLowerCase();
+        String type = databaseTypeLower();
 
         if (type.equals("mariadb") || type.equals("mysql")) {
             String host = plugin.getConfig().getString("database.host", "localhost");
@@ -96,7 +123,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to load players with public homes", e);
         }
         return players;
     }
@@ -143,7 +170,7 @@ public class DatabaseManager {
                 try {
                     conn.rollback();
                 } catch (SQLException rollbackEx) {
-                    plugin.getLogger().warning("Rollback failed: " + rollbackEx.getMessage());
+                    plugin.getLogger().log(Level.WARNING, "Rollback failed", rollbackEx);
                     txEx.addSuppressed(rollbackEx);
                 }
                 throw txEx;
@@ -151,7 +178,7 @@ public class DatabaseManager {
                 conn.setAutoCommit(previousAutoCommit);
             }
         } catch (SQLException e) {
-            plugin.getLogger().severe("Database initialization failed: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Database initialization failed", e);
             throw new RuntimeException(e);
         }
     }
@@ -173,10 +200,10 @@ public class DatabaseManager {
                 return;
             }
 
-            String type = plugin.getConfig().getString("database.type", "h2").toLowerCase();
+            String type = databaseTypeLower();
             MemoColumnDialect dialect = memoColumnDialect(type);
             if (dialect == null) {
-                plugin.getLogger().warning("Skipping memo column length adjust for database type: " + type);
+                plugin.getLogger().log(Level.WARNING, "Skipping memo column length adjust for database type: {0}", type);
                 return;
             }
             String alterSql = dialect.alterMemoColumnSql(desiredMemoLen);
@@ -189,15 +216,11 @@ public class DatabaseManager {
 
     private MemoColumnDialect memoColumnDialect(String type) {
         if (type == null) return null;
-        switch (type) {
-            case "mysql":
-            case "mariadb":
-                return length -> "ALTER TABLE player_homes MODIFY memo VARCHAR(" + length + ")";
-            case "h2":
-                return length -> "ALTER TABLE player_homes ALTER COLUMN memo VARCHAR(" + length + ")";
-            default:
-                return null;
-        }
+        return switch (type) {
+            case "mysql", "mariadb" -> length -> "ALTER TABLE player_homes MODIFY memo VARCHAR(" + length + ")";
+            case "h2" -> length -> "ALTER TABLE player_homes ALTER COLUMN memo VARCHAR(" + length + ")";
+            default -> null;
+        };
     }
 
     private void addColumnIfNotExists(Connection conn, String columnName, String columnDef) throws SQLException {
@@ -236,36 +259,58 @@ public class DatabaseManager {
         }
     }
 
-    public void setHome(UUID uuid, String name, Location loc, boolean isPublic) {
+    public void setHome(UUID uuid, String name, String worldName, double x, double y, double z, float yaw, float pitch, boolean isPublic) {
+        if (worldName == null || worldName.isBlank()) {
+            plugin.getLogger().severe("Failed to set home: worldName is null/blank");
+            return;
+        }
         String sql = "INSERT INTO player_homes (player_uuid, home_name, world_name, x, y, z, yaw, pitch, is_public) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) " +
                 "ON DUPLICATE KEY UPDATE world_name=?, x=?, y=?, z=?, yaw=?, pitch=?, is_public=?";
 
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
+
             stmt.setString(1, uuid.toString());
             stmt.setString(2, name);
-            stmt.setString(3, loc.getWorld().getName());
-            stmt.setDouble(4, loc.getX());
-            stmt.setDouble(5, loc.getY());
-            stmt.setDouble(6, loc.getZ());
-            stmt.setFloat(7, loc.getYaw());
-            stmt.setFloat(8, loc.getPitch());
+            stmt.setString(3, worldName);
+            stmt.setDouble(4, x);
+            stmt.setDouble(5, y);
+            stmt.setDouble(6, z);
+            stmt.setFloat(7, yaw);
+            stmt.setFloat(8, pitch);
             stmt.setBoolean(9, isPublic);
-            
-            stmt.setString(10, loc.getWorld().getName());
-            stmt.setDouble(11, loc.getX());
-            stmt.setDouble(12, loc.getY());
-            stmt.setDouble(13, loc.getZ());
-            stmt.setFloat(14, loc.getYaw());
-            stmt.setFloat(15, loc.getPitch());
+
+            stmt.setString(10, worldName);
+            stmt.setDouble(11, x);
+            stmt.setDouble(12, y);
+            stmt.setDouble(13, z);
+            stmt.setFloat(14, yaw);
+            stmt.setFloat(15, pitch);
             stmt.setBoolean(16, isPublic);
 
             stmt.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to set home", e);
         }
+    }
+
+    public void setHome(UUID uuid, String name, Location loc, boolean isPublic) {
+        if (loc == null || loc.getWorld() == null) {
+            plugin.getLogger().severe("Failed to set home: location/world is null");
+            return;
+        }
+        setHome(
+                uuid,
+                name,
+                loc.getWorld().getName(),
+                loc.getX(),
+                loc.getY(),
+                loc.getZ(),
+                loc.getYaw(),
+                loc.getPitch(),
+                isPublic
+        );
     }
 
     public void setHome(UUID uuid, String name, Location loc) {
@@ -281,7 +326,7 @@ public class DatabaseManager {
             stmt.setString(3, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to update public", e);
         }
     }
 
@@ -294,7 +339,7 @@ public class DatabaseManager {
             stmt.setString(3, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().severe("Failed to update favorite: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Failed to update favorite", e);
         }
     }
 
@@ -307,7 +352,7 @@ public class DatabaseManager {
             stmt.setString(3, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().severe("Failed to update memo: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Failed to update memo", e);
         }
     }
 
@@ -320,7 +365,7 @@ public class DatabaseManager {
             stmt.setString(3, oldName);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to rename home", e);
         }
     }
     
@@ -336,7 +381,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to read public status", e);
         }
         return false;
     }
@@ -350,22 +395,20 @@ public class DatabaseManager {
             stmt.setString(2, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to delete home", e);
         }
     }
 
-    public Location getHome(UUID uuid, String name) {
-        String sql = "SELECT * FROM player_homes WHERE player_uuid = ? AND home_name = ?";
-        
+    public HomeData getHomeData(UUID uuid, String name) {
+        String sql = "SELECT world_name, x, y, z, yaw, pitch FROM player_homes WHERE player_uuid = ? AND home_name = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, uuid.toString());
             stmt.setString(2, name);
-            
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return new Location(
-                            plugin.getServer().getWorld(rs.getString("world_name")),
+                    return new HomeData(
+                            rs.getString("world_name"),
                             rs.getDouble("x"),
                             rs.getDouble("y"),
                             rs.getDouble("z"),
@@ -375,9 +418,22 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to get home", e);
         }
         return null;
+    }
+
+    public Location getHome(UUID uuid, String name) {
+        HomeData data = getHomeData(uuid, name);
+        if (data == null) return null;
+        return new Location(
+                plugin.getServer().getWorld(data.worldName),
+                data.x,
+                data.y,
+                data.z,
+                data.yaw,
+                data.pitch
+        );
     }
 
     public Map<String, Boolean> getHomePublicStatus(UUID uuid) {
@@ -394,7 +450,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to load public status map", e);
         }
         return status;
     }
@@ -412,7 +468,7 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to load favorite status map", e);
         }
         return status;
     }
@@ -433,35 +489,50 @@ public class DatabaseManager {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to load memo map", e);
         }
         return memos;
     }
 
-    public Map<String, Location> getHomes(UUID uuid) {
-        Map<String, Location> homes = new HashMap<>();
-        String sql = "SELECT * FROM player_homes WHERE player_uuid = ?";
-        
+    public Map<String, HomeData> getHomesData(UUID uuid) {
+        Map<String, HomeData> homes = new HashMap<>();
+        String sql = "SELECT home_name, world_name, x, y, z, yaw, pitch FROM player_homes WHERE player_uuid = ?";
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, uuid.toString());
-            
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Location loc = new Location(
-                            plugin.getServer().getWorld(rs.getString("world_name")),
+                    String homeName = rs.getString("home_name");
+                    homes.put(homeName, new HomeData(
+                            rs.getString("world_name"),
                             rs.getDouble("x"),
                             rs.getDouble("y"),
                             rs.getDouble("z"),
                             rs.getFloat("yaw"),
                             rs.getFloat("pitch")
-                    );
-                    homes.put(rs.getString("home_name"), loc);
+                    ));
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            plugin.getLogger().log(Level.SEVERE, "Failed to load homes", e);
         }
         return homes;
+    }
+
+    public Map<String, Location> getHomes(UUID uuid) {
+        Map<String, Location> out = new HashMap<>();
+        Map<String, HomeData> data = getHomesData(uuid);
+        for (Map.Entry<String, HomeData> e : data.entrySet()) {
+            HomeData d = e.getValue();
+            out.put(e.getKey(), new Location(
+                    plugin.getServer().getWorld(d.worldName),
+                    d.x,
+                    d.y,
+                    d.z,
+                    d.yaw,
+                    d.pitch
+            ));
+        }
+        return out;
     }
 }

@@ -5,11 +5,11 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -20,12 +20,18 @@ import com.example.homes.manager.EconomyManager;
 import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.HomeTabCompleter;
 import com.example.homes.manager.InputListener;
-import com.example.homes.manager.SkriptImportManager;
+import com.example.homes.manager.SessionCleanupListener;
 import com.example.homes.manager.SoundManager;
 import com.example.homes.manager.TeleportManager;
 import com.example.homes.manager.TpaManager;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+
 public class HomesPlugin extends JavaPlugin {
+
+    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
+    private static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
     private HomeManager homeManager;
     private TeleportManager teleportManager;
@@ -34,11 +40,12 @@ public class HomesPlugin extends JavaPlugin {
     private SoundManager soundManager;
     private EconomyManager economyManager;
     private TpaManager tpaManager;
-    private SkriptImportManager skriptImportManager;
     @SuppressWarnings("unused")
     private DataListener dataListener;
     @SuppressWarnings("unused")
     private DeathListener deathListener;
+    @SuppressWarnings("unused")
+    private SessionCleanupListener sessionCleanupListener;
 
     private volatile Pattern homeNamePattern = Pattern.compile("^[^\\s:\\u00A7]+$");
     private volatile int maxHomeNameLength = 32;
@@ -61,15 +68,14 @@ public class HomesPlugin extends JavaPlugin {
         
         // Initialize Managers
         this.soundManager = new SoundManager(this);
+        this.economyManager = new EconomyManager(this);
         this.homeManager = new HomeManager(this);
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager); // Pass tpaManager
         this.inputListener = new InputListener(this, homeManager, soundManager);
         this.homeGUI = new HomeGUI(this, homeManager, teleportManager, soundManager, economyManager);
         this.dataListener = new DataListener(this, homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
-        
-        // Initialize Import Manager
-        this.skriptImportManager = new SkriptImportManager(this, homeManager);
+        this.sessionCleanupListener = new SessionCleanupListener(this, inputListener, tpaManager);
         
         // Link GUI and Input Listener
         this.homeGUI.setInputListener(inputListener);
@@ -77,25 +83,31 @@ public class HomesPlugin extends JavaPlugin {
 
         // Register TabCompleter
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
-        getCommand("home").setTabCompleter(tabCompleter);
-        getCommand("homes").setTabCompleter(tabCompleter);
-        getCommand("sethome").setTabCompleter(tabCompleter);
-        getCommand("delhome").setTabCompleter(tabCompleter);
-        getCommand("vhome").setTabCompleter(tabCompleter);
+        setTabCompleter("home", tabCompleter);
+        setTabCompleter("homes", tabCompleter);
+        setTabCompleter("sethome", tabCompleter);
+        setTabCompleter("delhome", tabCompleter);
+        setTabCompleter("vhome", tabCompleter);
         
         // TPA Commands Tab Completer (Reusing HomeTabCompleter logic if simple, or create new)
         // For now, TPA commands need player names. HomeTabCompleter already has some logic but we should extend it or just use it.
         // We will update HomeTabCompleter to handle these new commands.
-        getCommand("tpa").setTabCompleter(tabCompleter);
-        getCommand("tpahere").setTabCompleter(tabCompleter);
-        getCommand("tpaccept").setTabCompleter(tabCompleter);
-        getCommand("tpdeny").setTabCompleter(tabCompleter);
-        getCommand("tpcancel").setTabCompleter(tabCompleter);
-        getCommand("tpaignore").setTabCompleter(tabCompleter);
-        getCommand("tpatoggle").setTabCompleter(tabCompleter);
-        getCommand("back").setTabCompleter(tabCompleter);
+        setTabCompleter("tpa", tabCompleter);
+        setTabCompleter("tpahere", tabCompleter);
+        setTabCompleter("tpaccept", tabCompleter);
+        setTabCompleter("tpdeny", tabCompleter);
+        setTabCompleter("tpcancel", tabCompleter);
+        setTabCompleter("tpaignore", tabCompleter);
+        setTabCompleter("tpatoggle", tabCompleter);
+        setTabCompleter("back", tabCompleter);
 
         getLogger().info("HomesPlugin が有効になりました！");
+    }
+
+    private void setTabCompleter(String commandName, HomeTabCompleter tabCompleter) {
+        PluginCommand cmd = getCommand(commandName);
+        if (cmd == null) return;
+        cmd.setTabCompleter(tabCompleter);
     }
 
     @Override
@@ -107,9 +119,13 @@ public class HomesPlugin extends JavaPlugin {
     }
 
     public String getMessage(String key) {
+        return LEGACY_SECTION.serialize(getMessageComponent(key));
+    }
+
+    public Component getMessageComponent(String key) {
         String msg = getConfig().getString("messages." + key);
-        if (msg == null) return "Message not found: " + key;
-        return ChatColor.translateAlternateColorCodes('&', msg);
+        if (msg == null) return Component.text("Message not found: " + key);
+        return LEGACY_AMPERSAND.deserialize(msg);
     }
 
     public void reloadValidationSettings() {
@@ -148,7 +164,6 @@ public class HomesPlugin extends JavaPlugin {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        
         // /homes reload
         if (command.getName().equalsIgnoreCase("homes") && args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("homes.reload") && !sender.isOp()) {
@@ -189,12 +204,12 @@ public class HomesPlugin extends JavaPlugin {
             // Check economy for creating home
             if (economyManager != null && economyManager.hasEconomy()) {
                 double cost = getConfig().getDouble("economy.cost.set-home", 0);
-                if (cost > 0 && !economyManager.hasMoney(player.getName(), cost)) {
+                if (cost > 0 && !economyManager.hasMoney(player, cost)) {
                     player.sendMessage(getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
                     return true;
                 }
                 if (cost > 0) {
-                    economyManager.withdraw(player.getName(), cost);
+                    economyManager.withdraw(player, cost);
                     player.sendMessage(getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
                 }
             }
@@ -240,12 +255,12 @@ public class HomesPlugin extends JavaPlugin {
                 // Teleport cost
                  if (economyManager != null && economyManager.hasEconomy()) {
                      double cost = getConfig().getDouble("economy.cost.teleport", 0);
-                     if (cost > 0 && !economyManager.hasMoney(player.getName(), cost)) {
+                     if (cost > 0 && !economyManager.hasMoney(player, cost)) {
                         player.sendMessage(getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
                         return true;
                     }
                     if (cost > 0) {
-                        economyManager.withdraw(player.getName(), cost);
+                        economyManager.withdraw(player, cost);
                         player.sendMessage(getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
                     }
                 }
@@ -274,11 +289,15 @@ public class HomesPlugin extends JavaPlugin {
                 if (homes.isEmpty()) {
                     player.sendMessage(getMessage("no-homes"));
                 } else {
-                    player.sendMessage(ChatColor.GOLD + "=== " + getConfig().getString("gui.title", "Home List") + " ===");
+                    player.sendMessage(LEGACY_AMPERSAND.deserialize("&6=== " + getConfig().getString("gui.title", "Home List") + " ==="));
                     for (String name : homes.keySet()) {
                         Location loc = homes.get(name);
-                        player.sendMessage(ChatColor.YELLOW + "- " + name + ChatColor.GRAY + " (" + 
-                                loc.getWorld().getName() + ": " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + ")");
+                        if (loc != null && loc.getWorld() != null) {
+                            player.sendMessage(LEGACY_AMPERSAND.deserialize("&e- " + name + "&7 (" +
+                                    loc.getWorld().getName() + ": " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + ")"));
+                        } else {
+                            player.sendMessage(LEGACY_AMPERSAND.deserialize("&e- " + name));
+                        }
                     }
                 }
                 return true;
@@ -286,7 +305,7 @@ public class HomesPlugin extends JavaPlugin {
 
             // /homes <player> 機能は削除されました。代わりに /vhome <player> を使用してください。
             if (args.length > 0 && !args[0].equalsIgnoreCase("reload")) {
-                 player.sendMessage(ChatColor.YELLOW + "他のプレイヤーのホームを見るには " + ChatColor.GOLD + "/vhome <プレイヤー名>" + ChatColor.YELLOW + " を使用してください。");
+                 player.sendMessage(LEGACY_AMPERSAND.deserialize("&e他のプレイヤーのホームを見るには &6/vhome <プレイヤー名>&e を使用してください。"));
                  return true;
             }
 
@@ -297,13 +316,13 @@ public class HomesPlugin extends JavaPlugin {
         // /vhome <player>
         if (command.getName().equalsIgnoreCase("vhome")) {
             if (args.length == 0) {
-                player.sendMessage(ChatColor.RED + "使用法: /vhome <プレイヤー名>");
+                player.sendMessage(LEGACY_AMPERSAND.deserialize("&c使用法: /vhome <プレイヤー名>"));
                 return true;
             }
 
             String targetName = args[0];
             OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-            if (target == null || (!target.hasPlayedBefore() && !target.isOnline())) {
+            if (!target.hasPlayedBefore() && !target.isOnline()) {
                 sender.sendMessage(getMessage("player-not-found"));
                 return true;
             }
@@ -319,7 +338,7 @@ public class HomesPlugin extends JavaPlugin {
             if (sender.hasPermission("homes.admin")) {
                 sender.sendMessage(getMessage("admin-view").replace("{player}", name));
             } else {
-                sender.sendMessage(ChatColor.GREEN + name + "の公開ホームを表示します。");
+                sender.sendMessage(LEGACY_AMPERSAND.deserialize("&a" + name + "の公開ホームを表示します。"));
             }
 
             homeGUI.open(player, target);
