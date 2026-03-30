@@ -1,6 +1,9 @@
 package com.example.homes.manager;
 
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,6 +24,7 @@ public class InputListener implements Listener {
     private final SessionManager sessionManager;
     private final SoundManager soundManager;
     private HomeGUI homeGUI;
+    private final Map<UUID, Long> lastChatEventNanos = new ConcurrentHashMap<>();
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
     public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager) {
@@ -81,32 +85,60 @@ public class InputListener implements Listener {
         soundManager.play(player, "gui-click");
     }
 
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
-    public void onChatLegacy(AsyncPlayerChatEvent event) {
-        Player player = event.getPlayer();
+    private boolean isWaiting(UUID uuid) {
+        return sessionManager.isCreatingHome(uuid)
+                || sessionManager.isSearchingHomes(uuid)
+                || sessionManager.getEditingMemoTarget(uuid) != null
+                || sessionManager.getRenamingTarget(uuid) != null;
+    }
+
+    private void handleChatEvent(Player player, String message, Runnable cancelAction) {
         UUID uuid = player.getUniqueId();
-        if (!sessionManager.isCreatingHome(uuid) && !sessionManager.isSearchingHomes(uuid) && sessionManager.getEditingMemoTarget(uuid) == null && sessionManager.getRenamingTarget(uuid) == null) {
+        if (!isWaiting(uuid)) {
             return;
         }
-        String message = event.getMessage() == null ? "" : event.getMessage().trim();
-        event.setCancelled(true);
-        event.getRecipients().clear();
-        event.setMessage("");
+
+        long now = System.nanoTime();
+        long threshold = 50_000_000L;
+        AtomicBoolean accepted = new AtomicBoolean(false);
+        lastChatEventNanos.compute(uuid, (k, v) -> {
+            if (v == null || now - v >= threshold) {
+                accepted.set(true);
+                return now;
+            }
+            return v;
+        });
+
+        cancelAction.run();
+
+        if (!accepted.get()) {
+            return;
+        }
+
         plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+    @SuppressWarnings("deprecation")
+    public void onChatLegacy(AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        String message = event.getMessage().trim();
+        handleChatEvent(player, message, () -> {
+            event.setCancelled(true);
+            event.getRecipients().clear();
+            event.setMessage("");
+        });
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
-        UUID uuid = player.getUniqueId();
-        if (!sessionManager.isCreatingHome(uuid) && !sessionManager.isSearchingHomes(uuid) && sessionManager.getEditingMemoTarget(uuid) == null && sessionManager.getRenamingTarget(uuid) == null) {
-            return;
-        }
         String message = PLAIN_TEXT.serialize(event.originalMessage()).trim();
-        event.setCancelled(true);
-        event.viewers().clear(); // Clear viewers to prevent DiscordSRV and other plugins from broadcasting it
-        event.message(Component.empty());
-        plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
+        handleChatEvent(player, message, () -> {
+            event.setCancelled(true);
+            event.viewers().clear();
+            event.message(Component.empty());
+        });
     }
 
     private void handleChat(Player player, String message) {
