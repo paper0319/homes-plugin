@@ -162,8 +162,8 @@ public class HomesPlugin extends JavaPlugin {
         int maxLen = this.maxHomeNameLength;
         if (maxLen > 0 && name.length() > maxLen) return null;
 
-        // 正規表現（禁止ワード）による制限を完全に削除
-        // if (!this.homeNamePattern.matcher(name).matches()) return null;
+        // セキュリティのため、最低限の文字（コロンやセクション記号等）は弾く
+        if (!this.homeNamePattern.matcher(name).matches()) return null;
 
         return name;
     }
