@@ -196,7 +196,7 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
 
-            String homeName = validateHomeName(args[0]);
+            String homeName = validateHomeName(String.join(" ", args));
             if (homeName == null) {
                 player.sendMessage(getMessage("invalid-name"));
                 return true;
@@ -237,7 +237,7 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
 
-            String homeName = args[0];
+            String homeName = String.join(" ", args);
             if (!homeManager.hasHome(player, homeName)) {
                 player.sendMessage(getMessage("home-not-found").replace("{name}", homeName));
                 return true;
@@ -258,7 +258,7 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
 
-            String homeName = args[0];
+            String homeName = String.join(" ", args);
             
             // Check own home first
             if (homeManager.hasHome(player, homeName)) {
