@@ -763,7 +763,7 @@ public class HomeGUI implements Listener {
                     
                     if (sessionManager.isDeleteMode(viewer.getUniqueId())) {
                         // Delete Mode Logic (existing)
-                         new ConfirmGUI(plugin, homeManager, this, homeName, soundManager, target.getUniqueId()).open(viewer);
+                         new ConfirmGUI(plugin, homeManager, this, homeName, soundManager, target.getUniqueId(), sessionManager).open(viewer);
                          soundManager.play(viewer, "gui-click");
                     } else if (sessionManager.isRenameMode(viewer.getUniqueId()) && isOwner) {
                         // Rename Logic
@@ -799,8 +799,9 @@ public class HomeGUI implements Listener {
                         }
                         
                         homeManager.setPublic(target.getUniqueId(), homeName, newState);
+                        sessionManager.setPublicMode(viewer.getUniqueId(), false);
                         soundManager.play(viewer, "gui-click");
-                        
+
                         // Re-open to update icon
                         open(viewer, target);
                     } else {

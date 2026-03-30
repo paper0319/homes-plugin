@@ -18,6 +18,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import com.example.homes.HomesPlugin;
 import com.example.homes.manager.HomeManager;
+import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
 
 import net.kyori.adventure.text.Component;
@@ -32,21 +33,23 @@ public class ConfirmGUI implements Listener {
     private final String targetHome;
     private final UUID targetUUID;
     private final SoundManager soundManager;
+    private final SessionManager sessionManager;
     private boolean registered;
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
-    public ConfirmGUI(HomesPlugin plugin, HomeManager homeManager, HomeGUI homeGUI, String targetHome, SoundManager soundManager, UUID targetUUID) {
+    public ConfirmGUI(HomesPlugin plugin, HomeManager homeManager, HomeGUI homeGUI, String targetHome, SoundManager soundManager, UUID targetUUID, SessionManager sessionManager) {
         this.plugin = plugin;
         this.homeManager = homeManager;
         this.homeGUI = homeGUI;
         this.targetHome = targetHome;
         this.soundManager = soundManager;
         this.targetUUID = targetUUID;
+        this.sessionManager = sessionManager;
     }
-    
+
     public ConfirmGUI(HomesPlugin plugin, HomeManager homeManager, HomeGUI homeGUI, String targetHome, SoundManager soundManager) {
-        this(plugin, homeManager, homeGUI, targetHome, soundManager, null);
+        this(plugin, homeManager, homeGUI, targetHome, soundManager, null, null);
     }
 
     public void open(Player player) {
@@ -112,7 +115,10 @@ public class ConfirmGUI implements Listener {
             homeManager.deleteHome(uuid, targetHome);
             player.sendMessage(plugin.getMessage("home-deleted").replace("{name}", targetHome));
             soundManager.play(player, "delete-success");
-            
+            if (sessionManager != null) {
+                sessionManager.setDeleteMode(player.getUniqueId(), false);
+            }
+
             // Unregister listener and return to HomeGUI
             HandlerList.unregisterAll(this);
             registered = false;
@@ -128,7 +134,10 @@ public class ConfirmGUI implements Listener {
         // No (Cancel)
         if (slot == 15) {
             soundManager.play(player, "gui-click");
-            
+            if (sessionManager != null) {
+                sessionManager.setDeleteMode(player.getUniqueId(), false);
+            }
+
             // Unregister listener and return to HomeGUI
             HandlerList.unregisterAll(this);
             registered = false;

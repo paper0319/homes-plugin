@@ -183,6 +183,7 @@ messages:
   memo-cancelled: "&eメモ編集をキャンセルしました。"
   memo-too-long: "&cメモが長すぎます。(最大: {max})"
   cancel-info: "&7キャンセルするには &c'cancel' &7と入力してください。"
+  enter-new-name: "&a{old} の新しい名前を入力してください。"
   home-renamed: "&aホーム名を {old} から {new} に変更しました。"
   rename-cancelled: "&eリネームをキャンセルしました。"
   creation-cancelled: "&eホーム作成をキャンセルしました。"

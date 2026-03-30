@@ -170,6 +170,7 @@ public class InputListener implements Listener {
 
             if (message.equalsIgnoreCase("cancel")) {
                 sessionManager.setEditingMemoTarget(uuid, null);
+                sessionManager.setMemoMode(uuid, false);
                 player.sendMessage(plugin.getMessage("memo-cancelled"));
                 soundManager.play(player, "gui-click");
                 if (homeGUI != null) {
@@ -180,6 +181,7 @@ public class InputListener implements Listener {
 
             String homeName = sessionManager.getEditingMemoTarget(uuid);
             sessionManager.setEditingMemoTarget(uuid, null);
+            sessionManager.setMemoMode(uuid, false);
             String memo = message;
             if (memo.equalsIgnoreCase("clear")) {
                 memo = "";
@@ -215,8 +217,12 @@ public class InputListener implements Listener {
 
             if (message.equalsIgnoreCase("cancel")) {
                 sessionManager.setRenamingTarget(uuid, null);
+                sessionManager.setRenameMode(uuid, false);
                 player.sendMessage(plugin.getMessage("rename-cancelled"));
                 soundManager.play(player, "gui-click");
+                if (homeGUI != null) {
+                    homeGUI.open(player);
+                }
                 return;
             }
 
@@ -235,7 +241,8 @@ public class InputListener implements Listener {
 
             String oldName = sessionManager.getRenamingTarget(uuid);
             sessionManager.setRenamingTarget(uuid, null);
-            
+            sessionManager.setRenameMode(uuid, false);
+
             homeManager.renameHome(uuid, oldName, newName);
             player.sendMessage(plugin.getMessage("home-renamed").replace("{old}", oldName).replace("{new}", newName));
             soundManager.play(player, "teleport-success");
