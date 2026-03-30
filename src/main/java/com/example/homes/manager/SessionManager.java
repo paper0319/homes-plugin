@@ -1,7 +1,5 @@
 package com.example.homes.manager;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -11,17 +9,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SessionManager {
 
     // --- GUI Mode States ---
-    private final Set<UUID> deleteModePlayers = new HashSet<>();
-    private final Set<UUID> publicModePlayers = new HashSet<>();
-    private final Set<UUID> renameModePlayers = new HashSet<>();
-    private final Set<UUID> favoriteModePlayers = new HashSet<>();
-    private final Set<UUID> memoModePlayers = new HashSet<>();
+    private final Set<UUID> deleteModePlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> publicModePlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> renameModePlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> favoriteModePlayers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> memoModePlayers = ConcurrentHashMap.newKeySet();
     
     // --- Search & Pagination States ---
-    private final Map<UUID, String> searchQuery = new HashMap<>();
-    private final Map<UUID, Integer> currentStartIndex = new HashMap<>();
-    private final Map<UUID, Stack<Integer>> pageHistory = new HashMap<>();
-    private final Map<UUID, Integer> lastPageSize = new HashMap<>();
+    private final Map<UUID, String> searchQuery = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> currentStartIndex = new ConcurrentHashMap<>();
+    private final Map<UUID, Stack<Integer>> pageHistory = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> lastPageSize = new ConcurrentHashMap<>();
     
     // --- Input Waiting States ---
     private final Set<UUID> creatingHome = ConcurrentHashMap.newKeySet();

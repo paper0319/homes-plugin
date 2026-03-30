@@ -25,7 +25,6 @@ public class DeathListener implements Listener {
     public DeathListener(HomesPlugin plugin, TpaManager tpaManager) {
         this.plugin = plugin;
         this.tpaManager = tpaManager;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
     @EventHandler

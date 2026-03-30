@@ -72,13 +72,17 @@ public class HomesPlugin extends JavaPlugin {
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager); // Pass tpaManager
         this.inputListener = new InputListener(this, homeManager, sessionManager, soundManager);
         this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);
-        this.dataListener = new DataListener(this, homeManager);
+        this.dataListener = new DataListener(homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
-        this.sessionCleanupListener = new SessionCleanupListener(this, sessionManager, tpaManager);
+        this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager);
         
         // Link GUI and Input Listener
         this.homeGUI.setInputListener(inputListener);
         this.inputListener.setHomeGUI(homeGUI);
+
+        getServer().getPluginManager().registerEvents(dataListener, this);
+        getServer().getPluginManager().registerEvents(deathListener, this);
+        getServer().getPluginManager().registerEvents(sessionCleanupListener, this);
 
         // Register TabCompleter
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
@@ -102,7 +106,7 @@ public class HomesPlugin extends JavaPlugin {
 
         // Initialize bStats
         int pluginId = 30475; // Registered bStats plugin ID
-        Metrics metrics = new Metrics(this, pluginId);
+        new Metrics(this, pluginId);
 
         getLogger().info("HomesPlugin が有効になりました！");
     }

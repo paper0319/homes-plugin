@@ -1,6 +1,6 @@
 name: homes
 api: "1.21"
-version: ${app.version.major}.${app.version.minor}.${app.build.number}
+version: ${project.version}
 main: com.example.homes.HomesPlugin
 api-version: 1.21
 author: naonao
