@@ -1,9 +1,6 @@
 package com.example.homes.manager;
 
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,18 +17,16 @@ public class InputListener implements Listener {
 
     private final HomesPlugin plugin;
     private final HomeManager homeManager;
+    private final SessionManager sessionManager;
     private final SoundManager soundManager;
-    private final Set<UUID> creatingHome = ConcurrentHashMap.newKeySet();
-    private final Map<UUID, String> renamingHome = new ConcurrentHashMap<>();
-    private final Set<UUID> searchingHomes = ConcurrentHashMap.newKeySet();
-    private final Map<UUID, String> editingMemo = new ConcurrentHashMap<>();
     private HomeGUI homeGUI;
     private boolean registered;
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
-    public InputListener(HomesPlugin plugin, HomeManager homeManager, SoundManager soundManager) {
+    public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager) {
         this.plugin = plugin;
         this.homeManager = homeManager;
+        this.sessionManager = sessionManager;
         this.soundManager = soundManager;
     }
 
@@ -57,7 +52,7 @@ public class InputListener implements Listener {
             return;
         }
         
-        creatingHome.add(player.getUniqueId());
+        sessionManager.setCreatingHome(player.getUniqueId(), true);
         player.sendMessage(plugin.getMessage("enter-name"));
         player.sendMessage(plugin.getMessage("cancel-info"));
         player.closeInventory();
@@ -71,8 +66,8 @@ public class InputListener implements Listener {
             player.sendMessage("§7ホームを読み込み中...");
             return;
         }
-        renamingHome.put(player.getUniqueId(), oldName);
-        player.sendMessage(plugin.getMessage("enter-name"));
+        sessionManager.setRenamingTarget(player.getUniqueId(), oldName);
+        player.sendMessage(plugin.getMessage("enter-new-name").replace("{old}", oldName));
         player.sendMessage(plugin.getMessage("cancel-info"));
         player.closeInventory();
         soundManager.play(player, "gui-click");
@@ -80,7 +75,7 @@ public class InputListener implements Listener {
 
     public void startSearch(Player player) {
         ensureRegistered();
-        searchingHomes.add(player.getUniqueId());
+        sessionManager.setSearchingHomes(player.getUniqueId(), true);
         player.sendMessage(plugin.getMessage("enter-search"));
         player.sendMessage(plugin.getMessage("cancel-info"));
         player.closeInventory();
@@ -89,7 +84,7 @@ public class InputListener implements Listener {
 
     public void startEditMemo(Player player, String homeName) {
         ensureRegistered();
-        editingMemo.put(player.getUniqueId(), homeName);
+        sessionManager.setEditingMemoTarget(player.getUniqueId(), homeName);
         player.sendMessage(plugin.getMessage("enter-memo").replace("{name}", homeName));
         player.sendMessage(plugin.getMessage("cancel-info"));
         player.closeInventory();
@@ -100,7 +95,7 @@ public class InputListener implements Listener {
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
-        if (!creatingHome.contains(uuid) && !searchingHomes.contains(uuid) && !editingMemo.containsKey(uuid) && !renamingHome.containsKey(uuid)) {
+        if (!sessionManager.isCreatingHome(uuid) && !sessionManager.isSearchingHomes(uuid) && sessionManager.getEditingMemoTarget(uuid) == null && sessionManager.getRenamingTarget(uuid) == null) {
             return;
         }
         String message = PLAIN_TEXT.serialize(event.originalMessage()).trim();
@@ -113,8 +108,8 @@ public class InputListener implements Listener {
     private void handleChat(Player player, String message) {
         UUID uuid = player.getUniqueId();
 
-        if (searchingHomes.contains(uuid)) {
-            searchingHomes.remove(uuid);
+        if (sessionManager.isSearchingHomes(uuid)) {
+            sessionManager.setSearchingHomes(uuid, false);
 
             if (message.equalsIgnoreCase("cancel")) {
                 player.sendMessage(plugin.getMessage("search-cancelled"));
@@ -138,10 +133,10 @@ public class InputListener implements Listener {
             return;
         }
 
-        if (editingMemo.containsKey(uuid)) {
+        if (sessionManager.getEditingMemoTarget(uuid) != null) {
 
             if (message.equalsIgnoreCase("cancel")) {
-                editingMemo.remove(uuid);
+                sessionManager.setEditingMemoTarget(uuid, null);
                 player.sendMessage(plugin.getMessage("memo-cancelled"));
                 soundManager.play(player, "gui-click");
                 if (homeGUI != null) {
@@ -150,7 +145,8 @@ public class InputListener implements Listener {
                 return;
             }
 
-            String homeName = editingMemo.remove(uuid);
+            String homeName = sessionManager.getEditingMemoTarget(uuid);
+            sessionManager.setEditingMemoTarget(uuid, null);
             String memo = message;
             if (memo.equalsIgnoreCase("clear")) {
                 memo = "";
@@ -182,10 +178,10 @@ public class InputListener implements Listener {
             return;
         }
 
-        if (renamingHome.containsKey(uuid)) {
+        if (sessionManager.getRenamingTarget(uuid) != null) {
 
             if (message.equalsIgnoreCase("cancel")) {
-                renamingHome.remove(uuid);
+                sessionManager.setRenamingTarget(uuid, null);
                 player.sendMessage(plugin.getMessage("rename-cancelled"));
                 soundManager.play(player, "gui-click");
                 return;
@@ -204,7 +200,8 @@ public class InputListener implements Listener {
                 return;
             }
 
-            String oldName = renamingHome.remove(uuid);
+            String oldName = sessionManager.getRenamingTarget(uuid);
+            sessionManager.setRenamingTarget(uuid, null);
             
             homeManager.renameHome(uuid, oldName, newName);
             player.sendMessage(plugin.getMessage("home-renamed").replace("{old}", oldName).replace("{new}", newName));
@@ -215,12 +212,12 @@ public class InputListener implements Listener {
             return;
         }
 
-        if (!creatingHome.contains(uuid)) {
+        if (!sessionManager.isCreatingHome(uuid)) {
             return;
         }
 
         if (message.equalsIgnoreCase("cancel")) {
-            creatingHome.remove(uuid);
+            sessionManager.setCreatingHome(uuid, false);
             player.sendMessage(plugin.getMessage("creation-cancelled"));
             soundManager.play(player, "gui-click");
             return;
@@ -241,23 +238,20 @@ public class InputListener implements Listener {
 
         if (!homeManager.canSetHome(player)) {
             player.sendMessage(plugin.getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
-            creatingHome.remove(uuid);
+            sessionManager.setCreatingHome(uuid, false);
             return;
         }
 
         homeManager.setHome(player, homeName, player.getLocation());
         player.sendMessage(plugin.getMessage("home-created").replace("{name}", homeName));
         soundManager.play(player, "teleport-success");
-        creatingHome.remove(uuid);
+        sessionManager.setCreatingHome(uuid, false);
         if (homeGUI != null) {
             homeGUI.open(player);
         }
     }
 
     public void clearPlayerState(UUID uuid) {
-        creatingHome.remove(uuid);
-        searchingHomes.remove(uuid);
-        renamingHome.remove(uuid);
-        editingMemo.remove(uuid);
+        sessionManager.cleanup(uuid);
     }
 }

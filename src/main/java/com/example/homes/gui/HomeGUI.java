@@ -2,12 +2,8 @@ package com.example.homes.gui;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.Stack;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
@@ -31,6 +27,7 @@ import com.example.homes.HomesPlugin;
 import com.example.homes.manager.EconomyManager;
 import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.InputListener;
+import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
 import com.example.homes.manager.TeleportManager;
 
@@ -46,26 +43,17 @@ public class HomeGUI implements Listener {
     private final SoundManager soundManager;
     private final EconomyManager economyManager;
     private InputListener inputListener;
+    private final SessionManager sessionManager;
     private static final int GUI_SIZE_SMALL = 27;
     private static final int GUI_SIZE_LARGE = 54;
-    private final Set<UUID> deleteModePlayers = new HashSet<>();
-    private final Set<UUID> publicModePlayers = new HashSet<>();
-    private final Set<UUID> renameModePlayers = new HashSet<>();
-    private final Set<UUID> favoriteModePlayers = new HashSet<>();
-    private final Set<UUID> memoModePlayers = new HashSet<>();
-    private final Map<UUID, String> searchQuery = new HashMap<>();
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
     private boolean registered;
-    
-    // Pagination state
-    private final Map<UUID, Integer> currentStartIndex = new HashMap<>();
-    private final Map<UUID, Stack<Integer>> pageHistory = new HashMap<>();
-    private final Map<UUID, Integer> lastPageSize = new HashMap<>();
 
-    public HomeGUI(HomesPlugin plugin, HomeManager homeManager, TeleportManager teleportManager, SoundManager soundManager, EconomyManager economyManager) {
+    public HomeGUI(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, TeleportManager teleportManager, SoundManager soundManager, EconomyManager economyManager) {
         this.plugin = plugin;
         this.homeManager = homeManager;
+        this.sessionManager = sessionManager;
         this.teleportManager = teleportManager;
         this.soundManager = soundManager;
         this.economyManager = economyManager;
@@ -76,12 +64,7 @@ public class HomeGUI implements Listener {
     }
 
     public void setSearchQuery(UUID viewer, String query) {
-        String q = query == null ? "" : query.trim();
-        if (q.isEmpty()) {
-            searchQuery.remove(viewer);
-        } else {
-            searchQuery.put(viewer, q);
-        }
+        sessionManager.setSearchQuery(viewer, query);
     }
 
     public void open(Player player) {
@@ -103,11 +86,11 @@ public class HomeGUI implements Listener {
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());
         boolean isAdmin = viewer.hasPermission("homes.admin") && !isOwner;
         
-        boolean deleteMode = deleteModePlayers.contains(viewer.getUniqueId());
-        boolean publicMode = publicModePlayers.contains(viewer.getUniqueId());
-        boolean renameMode = renameModePlayers.contains(viewer.getUniqueId());
-        boolean favoriteMode = favoriteModePlayers.contains(viewer.getUniqueId());
-        boolean memoMode = memoModePlayers.contains(viewer.getUniqueId());
+        boolean deleteMode = sessionManager.isDeleteMode(viewer.getUniqueId());
+        boolean publicMode = sessionManager.isPublicMode(viewer.getUniqueId());
+        boolean renameMode = sessionManager.isRenameMode(viewer.getUniqueId());
+        boolean favoriteMode = sessionManager.isFavoriteMode(viewer.getUniqueId());
+        boolean memoMode = sessionManager.isMemoMode(viewer.getUniqueId());
         
         String titleKey = "gui.title";
         if (deleteMode) titleKey = "gui.delete-mode-title";
@@ -132,11 +115,10 @@ public class HomeGUI implements Listener {
         Component title = colorize(plugin.getConfig().getString(titleKey, defaultTitle));
         
         // Load and Sort Homes
-        // HomeManager.getHomes(OfflinePlayer) or getHomes(UUID) needed
         Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
         List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
-        String query = searchQuery.getOrDefault(viewer.getUniqueId(), "");
-        if (!query.isEmpty()) {
+        String query = sessionManager.getSearchQuery(viewer.getUniqueId());
+        if (query != null && !query.isEmpty()) {
             String qLower = query.toLowerCase();
             visibleHomes.removeIf(n -> !n.toLowerCase().contains(qLower));
         }
@@ -216,7 +198,7 @@ public class HomeGUI implements Listener {
             for (String line : configLore) {
                 lore.add(line);
             }
-            String active = searchQuery.get(viewer.getUniqueId());
+            String active = sessionManager.getSearchQuery(viewer.getUniqueId());
             if (active != null && !active.isEmpty()) {
                 lore.add("&e検索: " + active);
             }
@@ -368,22 +350,15 @@ public class HomeGUI implements Listener {
         }
         
         // Pagination Logic
-        if (!currentStartIndex.containsKey(viewer.getUniqueId())) {
-            currentStartIndex.put(viewer.getUniqueId(), 0);
-        }
-        if (!pageHistory.containsKey(viewer.getUniqueId())) {
-            pageHistory.put(viewer.getUniqueId(), new Stack<>());
-        }
-
-        int startIndex = currentStartIndex.get(viewer.getUniqueId());
+        int startIndex = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
         // Validation: if start index out of bounds, reset
         if (startIndex >= visibleHomes.size() && !visibleHomes.isEmpty()) {
             startIndex = 0;
-            currentStartIndex.put(viewer.getUniqueId(), 0);
-            pageHistory.get(viewer.getUniqueId()).clear();
+            sessionManager.setCurrentStartIndex(viewer.getUniqueId(), 0);
+            sessionManager.getPageHistory(viewer.getUniqueId()).clear();
         }
 
-        boolean hasPrev = !pageHistory.get(viewer.getUniqueId()).isEmpty();
+        boolean hasPrev = !sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty();
         int homesDisplayed = 0;
         
         // Iterate slots
@@ -522,7 +497,7 @@ public class HomeGUI implements Listener {
             }
         }
         
-        lastPageSize.put(viewer.getUniqueId(), homesDisplayed);
+        sessionManager.setLastPageSize(viewer.getUniqueId(), homesDisplayed);
 
         viewer.openInventory(inv);
     }
@@ -618,22 +593,20 @@ public class HomeGUI implements Listener {
             String displayName = meta != null ? plain(meta.displayName()) : "";
             if (displayName.contains("次のページ")) {
                 // Next Page
-                if (currentStartIndex.containsKey(viewer.getUniqueId())) {
-                    int currentStart = currentStartIndex.get(viewer.getUniqueId());
-                    int displayed = lastPageSize.getOrDefault(viewer.getUniqueId(), 0);
-                    
-                    pageHistory.get(viewer.getUniqueId()).push(currentStart);
-                    currentStartIndex.put(viewer.getUniqueId(), currentStart + displayed);
-                    
-                    soundManager.play(viewer, "gui-click");
-                    open(viewer, target);
-                }
+                int currentStart = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
+                int displayed = sessionManager.getLastPageSize(viewer.getUniqueId());
+                
+                sessionManager.getPageHistory(viewer.getUniqueId()).push(currentStart);
+                sessionManager.setCurrentStartIndex(viewer.getUniqueId(), currentStart + displayed);
+                
+                soundManager.play(viewer, "gui-click");
+                open(viewer, target);
                 return;
             } else if (displayName.contains("前のページ")) {
                 // Previous Page
-                if (pageHistory.containsKey(viewer.getUniqueId()) && !pageHistory.get(viewer.getUniqueId()).isEmpty()) {
-                    int prevStart = pageHistory.get(viewer.getUniqueId()).pop();
-                    currentStartIndex.put(viewer.getUniqueId(), prevStart);
+                if (!sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty()) {
+                    int prevStart = sessionManager.getPageHistory(viewer.getUniqueId()).pop();
+                    sessionManager.setCurrentStartIndex(viewer.getUniqueId(), prevStart);
                     
                     soundManager.play(viewer, "gui-click");
                     open(viewer, target);
@@ -660,16 +633,16 @@ public class HomeGUI implements Listener {
 
         // Rename Mode Button at Slot 1
         if (slot == 1 && isOwner) {
-            if (renameModePlayers.contains(viewer.getUniqueId())) {
-                renameModePlayers.remove(viewer.getUniqueId());
+            if (sessionManager.isRenameMode(viewer.getUniqueId())) {
+                sessionManager.setRenameMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             } else {
-                renameModePlayers.add(viewer.getUniqueId());
+                sessionManager.setRenameMode(viewer.getUniqueId(), true);
                 // Disable other modes
-                deleteModePlayers.remove(viewer.getUniqueId());
-                publicModePlayers.remove(viewer.getUniqueId());
-                favoriteModePlayers.remove(viewer.getUniqueId());
-                memoModePlayers.remove(viewer.getUniqueId());
+                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
+                sessionManager.setPublicMode(viewer.getUniqueId(), false);
+                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
+                sessionManager.setMemoMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target); 
@@ -678,15 +651,15 @@ public class HomeGUI implements Listener {
 
         // Favorite Mode Button at Slot 3
         if (slot == 3 && isOwner) {
-            if (favoriteModePlayers.contains(viewer.getUniqueId())) {
-                favoriteModePlayers.remove(viewer.getUniqueId());
+            if (sessionManager.isFavoriteMode(viewer.getUniqueId())) {
+                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             } else {
-                favoriteModePlayers.add(viewer.getUniqueId());
-                deleteModePlayers.remove(viewer.getUniqueId());
-                publicModePlayers.remove(viewer.getUniqueId());
-                renameModePlayers.remove(viewer.getUniqueId());
-                memoModePlayers.remove(viewer.getUniqueId());
+                sessionManager.setFavoriteMode(viewer.getUniqueId(), true);
+                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
+                sessionManager.setPublicMode(viewer.getUniqueId(), false);
+                sessionManager.setRenameMode(viewer.getUniqueId(), false);
+                sessionManager.setMemoMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target);
@@ -695,15 +668,15 @@ public class HomeGUI implements Listener {
 
         // Memo Mode Button at Slot 4
         if (slot == 4 && isOwner) {
-            if (memoModePlayers.contains(viewer.getUniqueId())) {
-                memoModePlayers.remove(viewer.getUniqueId());
+            if (sessionManager.isMemoMode(viewer.getUniqueId())) {
+                sessionManager.setMemoMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             } else {
-                memoModePlayers.add(viewer.getUniqueId());
-                deleteModePlayers.remove(viewer.getUniqueId());
-                publicModePlayers.remove(viewer.getUniqueId());
-                renameModePlayers.remove(viewer.getUniqueId());
-                favoriteModePlayers.remove(viewer.getUniqueId());
+                sessionManager.setMemoMode(viewer.getUniqueId(), true);
+                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
+                sessionManager.setPublicMode(viewer.getUniqueId(), false);
+                sessionManager.setRenameMode(viewer.getUniqueId(), false);
+                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target);
@@ -712,16 +685,16 @@ public class HomeGUI implements Listener {
 
         // Delete Mode Button at Slot 8
         if (slot == 8) {
-            if (deleteModePlayers.contains(viewer.getUniqueId())) {
-                deleteModePlayers.remove(viewer.getUniqueId());
+            if (sessionManager.isDeleteMode(viewer.getUniqueId())) {
+                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             } else {
-                deleteModePlayers.add(viewer.getUniqueId());
+                sessionManager.setDeleteMode(viewer.getUniqueId(), true);
                 // Disable other modes
-                publicModePlayers.remove(viewer.getUniqueId());
-                renameModePlayers.remove(viewer.getUniqueId());
-                favoriteModePlayers.remove(viewer.getUniqueId());
-                memoModePlayers.remove(viewer.getUniqueId());
+                sessionManager.setPublicMode(viewer.getUniqueId(), false);
+                sessionManager.setRenameMode(viewer.getUniqueId(), false);
+                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
+                sessionManager.setMemoMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target); 
@@ -730,16 +703,16 @@ public class HomeGUI implements Listener {
 
         // Public Mode Button at Slot 7
         if (slot == 7 && isOwner) {
-            if (publicModePlayers.contains(viewer.getUniqueId())) {
-                publicModePlayers.remove(viewer.getUniqueId());
+            if (sessionManager.isPublicMode(viewer.getUniqueId())) {
+                sessionManager.setPublicMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             } else {
-                publicModePlayers.add(viewer.getUniqueId());
+                sessionManager.setPublicMode(viewer.getUniqueId(), true);
                 // Disable other modes
-                deleteModePlayers.remove(viewer.getUniqueId());
-                renameModePlayers.remove(viewer.getUniqueId());
-                favoriteModePlayers.remove(viewer.getUniqueId());
-                memoModePlayers.remove(viewer.getUniqueId());
+                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
+                sessionManager.setRenameMode(viewer.getUniqueId(), false);
+                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
+                sessionManager.setMemoMode(viewer.getUniqueId(), false);
                 soundManager.play(viewer, "gui-click");
             }
             open(viewer, target); 
@@ -760,8 +733,8 @@ public class HomeGUI implements Listener {
                 List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
                 Collections.sort(visibleHomes);
                 
-                int startIndex = currentStartIndex.getOrDefault(viewer.getUniqueId(), 0);
-                boolean hasPrev = !pageHistory.getOrDefault(viewer.getUniqueId(), new Stack<>()).isEmpty();
+                int startIndex = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
+                boolean hasPrev = !sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty();
                 int guiSize = visibleHomes.size() > 18 ? GUI_SIZE_LARGE : GUI_SIZE_SMALL;
                 
                 // Simulate loop to find which home matches this slot
@@ -793,26 +766,26 @@ public class HomeGUI implements Listener {
                 if (matchedHome != null) {
                     String homeName = matchedHome;
                     
-                    if (deleteModePlayers.contains(viewer.getUniqueId())) {
+                    if (sessionManager.isDeleteMode(viewer.getUniqueId())) {
                         // Delete Mode Logic (existing)
                          new ConfirmGUI(plugin, homeManager, this, homeName, soundManager, target.getUniqueId()).open(viewer);
                          soundManager.play(viewer, "gui-click");
-                    } else if (renameModePlayers.contains(viewer.getUniqueId()) && isOwner) {
+                    } else if (sessionManager.isRenameMode(viewer.getUniqueId()) && isOwner) {
                         // Rename Logic
                         if (inputListener != null) {
                             inputListener.startRename(viewer, homeName);
                         }
-                    } else if (favoriteModePlayers.contains(viewer.getUniqueId()) && isOwner) {
+                    } else if (sessionManager.isFavoriteMode(viewer.getUniqueId()) && isOwner) {
                         boolean isFav = homeManager.isFavorite(target.getUniqueId(), homeName);
                         homeManager.setFavorite(target.getUniqueId(), homeName, !isFav);
                         soundManager.play(viewer, "gui-click");
-                        favoriteModePlayers.remove(viewer.getUniqueId());
+                        sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
                         open(viewer, target);
-                    } else if (memoModePlayers.contains(viewer.getUniqueId()) && isOwner) {
+                    } else if (sessionManager.isMemoMode(viewer.getUniqueId()) && isOwner) {
                         if (inputListener != null) {
                             inputListener.startEditMemo(viewer, homeName);
                         }
-                    } else if (publicModePlayers.contains(viewer.getUniqueId()) && isOwner) {
+                    } else if (sessionManager.isPublicMode(viewer.getUniqueId()) && isOwner) {
                         // Public Mode Logic
                         boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
                         boolean newState = !isPublic;
@@ -870,17 +843,7 @@ public class HomeGUI implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (event.getReason() != InventoryCloseEvent.Reason.OPEN_NEW) {
-            deleteModePlayers.remove(event.getPlayer().getUniqueId());
-            publicModePlayers.remove(event.getPlayer().getUniqueId());
-            renameModePlayers.remove(event.getPlayer().getUniqueId());
-            favoriteModePlayers.remove(event.getPlayer().getUniqueId());
-            memoModePlayers.remove(event.getPlayer().getUniqueId());
-            searchQuery.remove(event.getPlayer().getUniqueId());
-            
-            // Clear pagination data
-            currentStartIndex.remove(event.getPlayer().getUniqueId());
-            pageHistory.remove(event.getPlayer().getUniqueId());
-            lastPageSize.remove(event.getPlayer().getUniqueId());
+            sessionManager.cleanup(event.getPlayer().getUniqueId());
         }
     }
 }

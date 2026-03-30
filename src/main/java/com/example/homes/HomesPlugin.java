@@ -18,6 +18,7 @@ import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.HomeTabCompleter;
 import com.example.homes.manager.InputListener;
 import com.example.homes.manager.SessionCleanupListener;
+import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
 import com.example.homes.manager.TeleportManager;
 import com.example.homes.manager.TpaManager;
@@ -31,6 +32,7 @@ public class HomesPlugin extends JavaPlugin {
     private static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
     private HomeManager homeManager;
+    private SessionManager sessionManager;
     private TeleportManager teleportManager;
     private HomeGUI homeGUI;
     private InputListener inputListener;
@@ -63,15 +65,16 @@ public class HomesPlugin extends JavaPlugin {
         this.tpaManager = new TpaManager(this);
         
         // Initialize Managers
+        this.sessionManager = new SessionManager();
         this.soundManager = new SoundManager(this);
         this.economyManager = new EconomyManager(this);
         this.homeManager = new HomeManager(this);
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager); // Pass tpaManager
-        this.inputListener = new InputListener(this, homeManager, soundManager);
-        this.homeGUI = new HomeGUI(this, homeManager, teleportManager, soundManager, economyManager);
+        this.inputListener = new InputListener(this, homeManager, sessionManager, soundManager);
+        this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);
         this.dataListener = new DataListener(this, homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
-        this.sessionCleanupListener = new SessionCleanupListener(this, inputListener, tpaManager);
+        this.sessionCleanupListener = new SessionCleanupListener(this, sessionManager, tpaManager);
         
         // Link GUI and Input Listener
         this.homeGUI.setInputListener(inputListener);
