@@ -94,6 +94,7 @@ public class InputListener implements Listener {
         }
         String message = LEGACY_AMPERSAND.serialize(event.message()).trim();
         event.setCancelled(true);
+        event.viewers().clear(); // Clear viewers to prevent DiscordSRV and other plugins from broadcasting it
         plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
     }
 

@@ -48,7 +48,7 @@ public class HomesPlugin extends JavaPlugin {
     @SuppressWarnings("unused")
     private SessionCleanupListener sessionCleanupListener;
 
-    private volatile Pattern homeNamePattern = Pattern.compile("^[^:\\u00A7]+$");
+    private volatile Pattern homeNamePattern = Pattern.compile("^[^:\\u00A7/\\\\]+$");
     private volatile int maxHomeNameLength = 32;
     private volatile int maxHomeMemoLength = 15;
 
@@ -136,12 +136,12 @@ public class HomesPlugin extends JavaPlugin {
     public void reloadValidationSettings() {
         int maxLen = getConfig().getInt("settings.max-home-name-length", 32);
         int memoMaxLen = getConfig().getInt("settings.max-home-memo-length", 15);
-        String regex = getConfig().getString("settings.home-name-regex", "^[^:\\u00A7]+$");
+        String regex = getConfig().getString("settings.home-name-regex", "^[^:\\u00A7/\\\\]+$");
         Pattern compiled;
         try {
             compiled = Pattern.compile(regex);
         } catch (PatternSyntaxException e) {
-            compiled = Pattern.compile("^[^:\\u00A7]+$");
+            compiled = Pattern.compile("^[^:\\u00A7/\\\\]+$");
         }
         this.maxHomeNameLength = maxLen;
         this.maxHomeMemoLength = memoMaxLen;
@@ -162,7 +162,11 @@ public class HomesPlugin extends JavaPlugin {
         int maxLen = this.maxHomeNameLength;
         if (maxLen > 0 && name.length() > maxLen) return null;
 
-        // セキュリティのため、最低限の文字（コロンやセクション記号等）は弾く
+        for (int i = 0; i < name.length(); i++) {
+            char ch = name.charAt(i);
+            if (ch <= 0x1F || (ch >= 0x7F && ch <= 0x9F)) return null;
+        }
+
         if (!this.homeNamePattern.matcher(name).matches()) return null;
 
         return name;
