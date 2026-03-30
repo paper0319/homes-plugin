@@ -128,6 +128,25 @@ public class DatabaseManager {
         return players;
     }
 
+    public List<UUID> getPlayerUuidsWithPublicHomes() {
+        List<UUID> players = new ArrayList<>();
+        String sql = "SELECT DISTINCT player_uuid FROM player_homes WHERE is_public = true";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                String uuidStr = rs.getString("player_uuid");
+                try {
+                    players.add(UUID.fromString(uuidStr));
+                } catch (IllegalArgumentException e) {
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to load players with public homes", e);
+        }
+        return players;
+    }
+
     private void createTable() {
         String sql = "CREATE TABLE IF NOT EXISTS player_homes (" +
                 "id INT AUTO_INCREMENT PRIMARY KEY," +

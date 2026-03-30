@@ -93,6 +93,11 @@ public class HomeGUI implements Listener {
             plugin.getServer().getPluginManager().registerEvents(this, plugin);
             registered = true;
         }
+        if (!homeManager.isLoaded(target.getUniqueId())) {
+            viewer.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+            homeManager.ensureLoaded(target.getUniqueId()).thenRun(() -> plugin.getServer().getScheduler().runTask(plugin, () -> open(viewer, target)));
+            return;
+        }
         // Floodgate check removed
         
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());

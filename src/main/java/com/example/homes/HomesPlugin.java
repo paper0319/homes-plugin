@@ -1,9 +1,5 @@
 package com.example.homes;
 
-import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -48,7 +44,6 @@ public class HomesPlugin extends JavaPlugin {
     @SuppressWarnings("unused")
     private SessionCleanupListener sessionCleanupListener;
 
-    private volatile Pattern homeNamePattern = Pattern.compile("^[^:\\u00A7/\\\\&]+$");
     private volatile int maxHomeNameLength = 32;
     private volatile int maxHomeMemoLength = 15;
 
@@ -136,16 +131,8 @@ public class HomesPlugin extends JavaPlugin {
     public void reloadValidationSettings() {
         int maxLen = getConfig().getInt("settings.max-home-name-length", 32);
         int memoMaxLen = getConfig().getInt("settings.max-home-memo-length", 15);
-        String regex = getConfig().getString("settings.home-name-regex", "^[^:\\u00A7/\\\\&]+$");
-        Pattern compiled;
-        try {
-            compiled = Pattern.compile(regex);
-        } catch (PatternSyntaxException e) {
-            compiled = Pattern.compile("^[^:\\u00A7/\\\\&]+$");
-        }
         this.maxHomeNameLength = maxLen;
         this.maxHomeMemoLength = memoMaxLen;
-        this.homeNamePattern = compiled;
     }
 
     public int getMaxHomeMemoLength() {
@@ -161,8 +148,6 @@ public class HomesPlugin extends JavaPlugin {
 
         int maxLen = this.maxHomeNameLength;
         if (maxLen > 0 && name.length() > maxLen) return null;
-
-        if (!this.homeNamePattern.matcher(name).matches()) return null;
 
         return name;
     }
@@ -201,32 +186,36 @@ public class HomesPlugin extends JavaPlugin {
                 player.sendMessage(getMessage("invalid-name"));
                 return true;
             }
-            if (homeManager.hasHome(player, homeName)) {
-                player.sendMessage(getMessage("home-exists"));
-                return true;
+            if (!homeManager.isLoaded(player.getUniqueId())) {
+                player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
             }
-
-            if (!homeManager.canSetHome(player)) {
-                player.sendMessage(getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
-                return true;
-            }
-
-            // Check economy for creating home
-            if (economyManager != null && economyManager.hasEconomy()) {
-                double cost = getConfig().getDouble("economy.cost.set-home", 0);
-                if (cost > 0 && !economyManager.hasMoney(player, cost)) {
-                    player.sendMessage(getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
-                    return true;
+            homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes -> getServer().getScheduler().runTask(this, () -> {
+                if (homes.containsKey(homeName)) {
+                    player.sendMessage(getMessage("home-exists"));
+                    return;
                 }
-                if (cost > 0) {
-                    economyManager.withdraw(player, cost);
-                    player.sendMessage(getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
-                }
-            }
 
-            homeManager.setHome(player, homeName, player.getLocation());
-            player.sendMessage(getMessage("home-set").replace("{name}", homeName));
-            // soundManager.play(player, "home-created"); // Optional
+                int max = homeManager.getMaxHomes(player);
+                if (homes.size() >= max) {
+                    player.sendMessage(getMessage("max-homes-reached").replace("{max}", String.valueOf(max)));
+                    return;
+                }
+
+                if (economyManager != null && economyManager.hasEconomy()) {
+                    double cost = getConfig().getDouble("economy.cost.set-home", 0);
+                    if (cost > 0 && !economyManager.hasMoney(player, cost)) {
+                        player.sendMessage(getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
+                        return;
+                    }
+                    if (cost > 0) {
+                        economyManager.withdraw(player, cost);
+                        player.sendMessage(getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
+                    }
+                }
+
+                homeManager.setHome(player, homeName, player.getLocation());
+                player.sendMessage(getMessage("home-set").replace("{name}", homeName));
+            }));
             return true;
         }
 
@@ -238,14 +227,19 @@ public class HomesPlugin extends JavaPlugin {
             }
 
             String homeName = String.join(" ", args);
-            if (!homeManager.hasHome(player, homeName)) {
-                player.sendMessage(getMessage("home-not-found").replace("{name}", homeName));
-                return true;
+            if (!homeManager.isLoaded(player.getUniqueId())) {
+                player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
             }
+            homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes -> getServer().getScheduler().runTask(this, () -> {
+                if (!homes.containsKey(homeName)) {
+                    player.sendMessage(getMessage("home-not-found").replace("{name}", homeName));
+                    return;
+                }
 
-            homeManager.deleteHome(player, homeName);
-            player.sendMessage(getMessage("home-deleted").replace("{name}", homeName));
-            soundManager.play(player, "delete-success");
+                homeManager.deleteHome(player, homeName);
+                player.sendMessage(getMessage("home-deleted").replace("{name}", homeName));
+                soundManager.play(player, "delete-success");
+            }));
             return true;
         }
 
@@ -260,33 +254,30 @@ public class HomesPlugin extends JavaPlugin {
 
             String homeName = String.join(" ", args);
             
-            // Check own home first
-            if (homeManager.hasHome(player, homeName)) {
-                // Teleport cost
-                 if (economyManager != null && economyManager.hasEconomy()) {
-                     double cost = getConfig().getDouble("economy.cost.teleport", 0);
-                     if (cost > 0 && !economyManager.hasMoney(player, cost)) {
+            if (!homeManager.isLoaded(player.getUniqueId())) {
+                player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+            }
+            homeManager.getHomeAsync(player.getUniqueId(), homeName).thenAccept(loc -> getServer().getScheduler().runTask(this, () -> {
+                if (loc == null) {
+                    player.sendMessage(getMessage("home-not-found").replace("{name}", homeName));
+                    player.sendMessage(getMessage("use-gui-info"));
+                    return;
+                }
+
+                if (economyManager != null && economyManager.hasEconomy()) {
+                    double cost = getConfig().getDouble("economy.cost.teleport", 0);
+                    if (cost > 0 && !economyManager.hasMoney(player, cost)) {
                         player.sendMessage(getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
-                        return true;
+                        return;
                     }
                     if (cost > 0) {
                         economyManager.withdraw(player, cost);
                         player.sendMessage(getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
                     }
                 }
-                
-                Location loc = homeManager.getHome(player, homeName);
-                if (loc != null) {
-                    teleportManager.teleport(player, loc);
-                }
-                return true;
-            } 
-            
-            // /home <player>:<home> 機能は削除されました。
-            // 代わりに /vhome <player> を使用してください。
 
-            player.sendMessage(getMessage("home-not-found").replace("{name}", homeName));
-            player.sendMessage(getMessage("use-gui-info"));
+                teleportManager.teleport(player, loc);
+            }));
             return true;
         }
 
@@ -295,10 +286,15 @@ public class HomesPlugin extends JavaPlugin {
             
             // /homes list
             if (args.length > 0 && args[0].equalsIgnoreCase("list")) {
-                Map<String, Location> homes = homeManager.getHomes(player);
-                if (homes.isEmpty()) {
-                    player.sendMessage(getMessage("no-homes"));
-                } else {
+                if (!homeManager.isLoaded(player.getUniqueId())) {
+                    player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+                }
+                homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes -> getServer().getScheduler().runTask(this, () -> {
+                    if (homes.isEmpty()) {
+                        player.sendMessage(getMessage("no-homes"));
+                        return;
+                    }
+
                     player.sendMessage(LEGACY_AMPERSAND.deserialize("&6=== " + getConfig().getString("gui.title", "Home List") + " ==="));
                     for (String name : homes.keySet()) {
                         Location loc = homes.get(name);
@@ -309,7 +305,7 @@ public class HomesPlugin extends JavaPlugin {
                             player.sendMessage(LEGACY_AMPERSAND.deserialize("&e- " + name));
                         }
                     }
-                }
+                }));
                 return true;
             }
 

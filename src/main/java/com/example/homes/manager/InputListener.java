@@ -14,7 +14,6 @@ import com.example.homes.gui.HomeGUI;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class InputListener implements Listener {
@@ -28,7 +27,6 @@ public class InputListener implements Listener {
     private final Map<UUID, String> editingMemo = new ConcurrentHashMap<>();
     private HomeGUI homeGUI;
     private boolean registered;
-    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
     public InputListener(HomesPlugin plugin, HomeManager homeManager, SoundManager soundManager) {
@@ -49,6 +47,11 @@ public class InputListener implements Listener {
 
     public void startCreation(Player player) {
         ensureRegistered();
+        if (!homeManager.isLoaded(player.getUniqueId())) {
+            homeManager.loadHomes(player.getUniqueId());
+            player.sendMessage("§7ホームを読み込み中...");
+            return;
+        }
         if (!homeManager.canSetHome(player)) {
             player.sendMessage(plugin.getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
             return;
@@ -63,6 +66,11 @@ public class InputListener implements Listener {
 
     public void startRename(Player player, String oldName) {
         ensureRegistered();
+        if (!homeManager.isLoaded(player.getUniqueId())) {
+            homeManager.loadHomes(player.getUniqueId());
+            player.sendMessage("§7ホームを読み込み中...");
+            return;
+        }
         renamingHome.put(player.getUniqueId(), oldName);
         player.sendMessage(plugin.getMessage("enter-name"));
         player.sendMessage(plugin.getMessage("cancel-info"));
@@ -95,18 +103,11 @@ public class InputListener implements Listener {
         if (!creatingHome.contains(uuid) && !searchingHomes.contains(uuid) && !editingMemo.containsKey(uuid) && !renamingHome.containsKey(uuid)) {
             return;
         }
-        String message = PLAIN_TEXT.serialize(getOriginalMessage(event)).trim();
+        String message = PLAIN_TEXT.serialize(event.originalMessage()).trim();
         event.setCancelled(true);
         event.viewers().clear(); // Clear viewers to prevent DiscordSRV and other plugins from broadcasting it
+        event.message(Component.empty());
         plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
-    }
-
-    private Component getOriginalMessage(AsyncChatEvent event) {
-        try {
-            return (Component) event.getClass().getMethod("originalMessage").invoke(event);
-        } catch (ReflectiveOperationException e) {
-            return event.message();
-        }
     }
 
     private void handleChat(Player player, String message) {
