@@ -194,7 +194,7 @@ public class TeleportManager {
         if (isHazard(ground.getType())) return false;
 
         Block aboveHead = head.getRelative(BlockFace.UP);
-        if (!aboveHead.isPassable() && aboveHead.getType().isSolid() && head.getType().isSolid()) {
+        if (!aboveHead.isPassable() && aboveHead.getType().isSolid()) {
             return false;
         }
 
