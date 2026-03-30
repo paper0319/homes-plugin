@@ -4,7 +4,8 @@ settings:
   # -1 に設定すると無制限になります（実際にはInteger.MAX_VALUE）
   op-home-limit: 100
   max-home-name-length: 32
-  home-name-regex: '^[^\s:\u00A7]+$'
+  # ホーム名に使用できる文字の正規表現 (デフォルト: コロンとセクション記号以外すべて許可)
+  home-name-regex: '^[^:\u00A7]+$'
   max-home-memo-length: 15
   teleport-delay: 3
   safe-teleport:
