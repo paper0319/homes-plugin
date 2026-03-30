@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -100,6 +101,10 @@ public class HomesPlugin extends JavaPlugin {
         setTabCompleter("tpaignore", tabCompleter);
         setTabCompleter("tpatoggle", tabCompleter);
         setTabCompleter("back", tabCompleter);
+
+        // Initialize bStats
+        int pluginId = 30475; // Registered bStats plugin ID
+        Metrics metrics = new Metrics(this, pluginId);
 
         getLogger().info("HomesPlugin が有効になりました！");
     }
