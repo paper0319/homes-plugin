@@ -85,7 +85,7 @@ public class InputListener implements Listener {
         soundManager.play(player, "gui-click");
     }
 
-    @EventHandler
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         UUID uuid = player.getUniqueId();
