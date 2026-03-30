@@ -13,7 +13,9 @@ import com.example.homes.HomesPlugin;
 import com.example.homes.gui.HomeGUI;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class InputListener implements Listener {
 
@@ -27,6 +29,7 @@ public class InputListener implements Listener {
     private HomeGUI homeGUI;
     private boolean registered;
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
+    private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
     public InputListener(HomesPlugin plugin, HomeManager homeManager, SoundManager soundManager) {
         this.plugin = plugin;
@@ -92,10 +95,18 @@ public class InputListener implements Listener {
         if (!creatingHome.contains(uuid) && !searchingHomes.contains(uuid) && !editingMemo.containsKey(uuid) && !renamingHome.containsKey(uuid)) {
             return;
         }
-        String message = LEGACY_AMPERSAND.serialize(event.message()).trim();
+        String message = PLAIN_TEXT.serialize(getOriginalMessage(event)).trim();
         event.setCancelled(true);
         event.viewers().clear(); // Clear viewers to prevent DiscordSRV and other plugins from broadcasting it
         plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
+    }
+
+    private Component getOriginalMessage(AsyncChatEvent event) {
+        try {
+            return (Component) event.getClass().getMethod("originalMessage").invoke(event);
+        } catch (ReflectiveOperationException e) {
+            return event.message();
+        }
     }
 
     private void handleChat(Player player, String message) {
