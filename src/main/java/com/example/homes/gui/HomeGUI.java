@@ -838,7 +838,10 @@ public class HomeGUI implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (event.getReason() != InventoryCloseEvent.Reason.OPEN_NEW) {
-            sessionManager.cleanup(event.getPlayer().getUniqueId());
+            UUID uuid = event.getPlayer().getUniqueId();
+            if (!sessionManager.isWaitingForInput(uuid)) {
+                sessionManager.cleanup(uuid);
+            }
         }
     }
 }

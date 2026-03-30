@@ -97,4 +97,11 @@ public class SessionManager {
         if(target == null) editingMemoTarget.remove(uuid);
         else editingMemoTarget.put(uuid, target);
     }
+
+    public boolean isWaitingForInput(UUID uuid) {
+        return creatingHome.contains(uuid)
+                || searchingHomes.contains(uuid)
+                || editingMemoTarget.containsKey(uuid)
+                || renamingHomeTarget.containsKey(uuid);
+    }
 }

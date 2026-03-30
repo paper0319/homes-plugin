@@ -86,10 +86,7 @@ public class InputListener implements Listener {
     }
 
     private boolean isWaiting(UUID uuid) {
-        return sessionManager.isCreatingHome(uuid)
-                || sessionManager.isSearchingHomes(uuid)
-                || sessionManager.getEditingMemoTarget(uuid) != null
-                || sessionManager.getRenamingTarget(uuid) != null;
+        return sessionManager.isWaitingForInput(uuid);
     }
 
     private void handleChatEvent(Player player, String message, Runnable cancelAction) {
