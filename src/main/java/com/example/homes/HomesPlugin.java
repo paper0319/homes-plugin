@@ -77,6 +77,8 @@ public class HomesPlugin extends JavaPlugin {
         this.homeGUI.setInputListener(inputListener);
         this.inputListener.setHomeGUI(homeGUI);
 
+        getServer().getPluginManager().registerEvents(homeGUI, this);
+        getServer().getPluginManager().registerEvents(inputListener, this);
         getServer().getPluginManager().registerEvents(dataListener, this);
         getServer().getPluginManager().registerEvents(deathListener, this);
         getServer().getPluginManager().registerEvents(sessionCleanupListener, this);

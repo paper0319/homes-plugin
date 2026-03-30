@@ -20,7 +20,6 @@ public class InputListener implements Listener {
     private final SessionManager sessionManager;
     private final SoundManager soundManager;
     private HomeGUI homeGUI;
-    private boolean registered;
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
     public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager) {
@@ -34,14 +33,7 @@ public class InputListener implements Listener {
         this.homeGUI = homeGUI;
     }
 
-    private void ensureRegistered() {
-        if (registered) return;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        registered = true;
-    }
-
     public void startCreation(Player player) {
-        ensureRegistered();
         if (!homeManager.isLoaded(player.getUniqueId())) {
             homeManager.loadHomes(player.getUniqueId());
             player.sendMessage("§7ホームを読み込み中...");
@@ -60,7 +52,6 @@ public class InputListener implements Listener {
     }
 
     public void startRename(Player player, String oldName) {
-        ensureRegistered();
         if (!homeManager.isLoaded(player.getUniqueId())) {
             homeManager.loadHomes(player.getUniqueId());
             player.sendMessage("§7ホームを読み込み中...");
@@ -74,7 +65,6 @@ public class InputListener implements Listener {
     }
 
     public void startSearch(Player player) {
-        ensureRegistered();
         sessionManager.setSearchingHomes(player.getUniqueId(), true);
         player.sendMessage(plugin.getMessage("enter-search"));
         player.sendMessage(plugin.getMessage("cancel-info"));
@@ -83,7 +73,6 @@ public class InputListener implements Listener {
     }
 
     public void startEditMemo(Player player, String homeName) {
-        ensureRegistered();
         sessionManager.setEditingMemoTarget(player.getUniqueId(), homeName);
         player.sendMessage(plugin.getMessage("enter-memo").replace("{name}", homeName));
         player.sendMessage(plugin.getMessage("cancel-info"));

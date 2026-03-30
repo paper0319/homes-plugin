@@ -48,7 +48,6 @@ public class HomeGUI implements Listener {
     private static final int GUI_SIZE_LARGE = 54;
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
-    private boolean registered;
 
     public HomeGUI(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, TeleportManager teleportManager, SoundManager soundManager, EconomyManager economyManager) {
         this.plugin = plugin;
@@ -72,10 +71,6 @@ public class HomeGUI implements Listener {
     }
     
     public void open(Player viewer, OfflinePlayer target) {
-        if (!registered) {
-            plugin.getServer().getPluginManager().registerEvents(this, plugin);
-            registered = true;
-        }
         if (!homeManager.isLoaded(target.getUniqueId())) {
             viewer.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
             homeManager.ensureLoaded(target.getUniqueId()).thenRun(() -> plugin.getServer().getScheduler().runTask(plugin, () -> open(viewer, target)));
