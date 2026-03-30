@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -88,7 +89,11 @@ public class HomeManager {
                                 com.example.homes.database.DatabaseManager.HomeData d = e.getValue();
                                 World world = plugin.getServer().getWorld(d.worldName);
                                 if (world == null) {
-                                    plugin.getLogger().warning("World '" + d.worldName + "' not found for home '" + e.getKey() + "' of player " + id);
+                                    plugin.getLogger().log(
+                                            Level.WARNING,
+                                            "World ''{0}'' not found for home ''{1}'' of player {2}",
+                                            new Object[] { d.worldName, e.getKey(), id }
+                                    );
                                     continue;
                                 }
 
@@ -105,10 +110,10 @@ public class HomeManager {
                             loading.remove(id);
                             future.complete(null);
                         });
-                    } catch (Throwable t) {
+                    } catch (RuntimeException e) {
                         plugin.getServer().getScheduler().runTask(plugin, () -> {
                             loading.remove(id);
-                            future.completeExceptionally(t);
+                            future.completeExceptionally(e);
                         });
                     }
                 }

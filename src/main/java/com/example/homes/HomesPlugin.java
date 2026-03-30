@@ -39,11 +39,8 @@ public class HomesPlugin extends JavaPlugin {
     private SoundManager soundManager;
     private EconomyManager economyManager;
     private TpaManager tpaManager;
-    @SuppressWarnings("unused")
     private DataListener dataListener;
-    @SuppressWarnings("unused")
     private DeathListener deathListener;
-    @SuppressWarnings("unused")
     private SessionCleanupListener sessionCleanupListener;
 
     private volatile int maxHomeNameLength = 32;
@@ -106,7 +103,8 @@ public class HomesPlugin extends JavaPlugin {
 
         // Initialize bStats
         int pluginId = 30475; // Registered bStats plugin ID
-        new Metrics(this, pluginId);
+        @SuppressWarnings("unused")
+        Metrics metrics = new Metrics(this, pluginId);
 
         getLogger().info("HomesPlugin が有効になりました！");
     }
@@ -161,6 +159,7 @@ public class HomesPlugin extends JavaPlugin {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (sender == null) return true;
         // /homes reload
         if (command.getName().equalsIgnoreCase("homes") && args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("homes.reload") && !sender.isOp()) {

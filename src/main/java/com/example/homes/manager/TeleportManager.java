@@ -95,27 +95,29 @@ public class TeleportManager {
     }
     
     private boolean doTeleport(Player player, Object target) {
-        if (target instanceof Player targetPlayer) {
-            if (targetPlayer.isOnline()) {
-                player.teleport(targetPlayer.getLocation());
-                playTeleportEffect(player);
-                return true;
-            } else {
+        return switch (target) {
+            case Player targetPlayer -> {
+                if (targetPlayer.isOnline()) {
+                    player.teleport(targetPlayer.getLocation());
+                    playTeleportEffect(player);
+                    yield true;
+                }
                 player.sendMessage(Component.text("テレポート先が見つかりません。", NamedTextColor.RED));
-                return false;
+                yield false;
             }
-        } else if (target instanceof Location targetLocation) {
-            Location safe = findSafeLocation(targetLocation);
-            if (safe == null) {
-                player.sendMessage(plugin.getMessage("teleport-unsafe"));
-                soundManager.play(player, "teleport-fail");
-                return false;
+            case Location targetLocation -> {
+                Location safe = findSafeLocation(targetLocation);
+                if (safe == null) {
+                    player.sendMessage(plugin.getMessage("teleport-unsafe"));
+                    soundManager.play(player, "teleport-fail");
+                    yield false;
+                }
+                player.teleport(safe);
+                playTeleportEffect(player);
+                yield true;
             }
-            player.teleport(safe);
-            playTeleportEffect(player);
-            return true;
-        }
-        return false;
+            default -> false;
+        };
     }
 
     private void playTeleportEffect(Player player) {
@@ -194,25 +196,14 @@ public class TeleportManager {
         if (isHazard(ground.getType())) return false;
 
         Block aboveHead = head.getRelative(BlockFace.UP);
-        if (!aboveHead.isPassable() && aboveHead.getType().isSolid()) {
-            return false;
-        }
-
-        return true;
+        return !aboveHead.getType().isSolid();
     }
 
     private boolean isHazard(org.bukkit.Material type) {
         if (type == null) return true;
-        if (type == org.bukkit.Material.LAVA) return true;
-        if (type == org.bukkit.Material.WATER) return true;
-        if (type == org.bukkit.Material.FIRE) return true;
-        if (type == org.bukkit.Material.SOUL_FIRE) return true;
-        if (type == org.bukkit.Material.CAMPFIRE) return true;
-        if (type == org.bukkit.Material.SOUL_CAMPFIRE) return true;
-        if (type == org.bukkit.Material.CACTUS) return true;
-        if (type == org.bukkit.Material.MAGMA_BLOCK) return true;
-        if (type == org.bukkit.Material.SWEET_BERRY_BUSH) return true;
-        if (type == org.bukkit.Material.POWDER_SNOW) return true;
-        return false;
+        return switch (type) {
+            case LAVA, WATER, FIRE, SOUL_FIRE, CAMPFIRE, SOUL_CAMPFIRE, CACTUS, MAGMA_BLOCK, SWEET_BERRY_BUSH, POWDER_SNOW -> true;
+            default -> false;
+        };
     }
 }

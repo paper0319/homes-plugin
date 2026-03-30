@@ -53,6 +53,7 @@ public class SoundManager {
         }
     }
 
+    @SuppressWarnings("removal")
     private Sound resolveSound(String raw) {
         if (raw == null) return null;
         String normalized = raw.trim();
