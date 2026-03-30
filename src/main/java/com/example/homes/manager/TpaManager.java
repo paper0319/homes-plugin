@@ -208,10 +208,15 @@ public class TpaManager {
     }
 
     public void saveLastLocation(Player player) {
-        // Check config if we should save
-        if (plugin.getConfig().getBoolean("settings.back.enabled", true)) {
-             lastLocations.put(player.getUniqueId(), player.getLocation());
+        trySaveLastLocation(player);
+    }
+
+    public boolean trySaveLastLocation(Player player) {
+        if (!plugin.getConfig().getBoolean("settings.back.enabled", true)) {
+            return false;
         }
+        lastLocations.put(player.getUniqueId(), player.getLocation());
+        return true;
     }
 
     public void teleportBack(Player player) {

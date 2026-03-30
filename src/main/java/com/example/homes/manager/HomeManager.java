@@ -3,6 +3,7 @@ package com.example.homes.manager;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,6 +32,8 @@ public class HomeManager {
     // Cache: UUID -> (HomeName -> String) - Memo
     private final Map<UUID, Map<String, String>> memoCache = new ConcurrentHashMap<>();
 
+    private final Set<UUID> loaded = ConcurrentHashMap.newKeySet();
+
     public HomeManager(HomesPlugin plugin) {
         this.plugin = plugin;
         setup();
@@ -48,6 +51,7 @@ public class HomeManager {
 
     // Load data asynchronously
     public void loadHomes(UUID uuid) {
+        loaded.remove(uuid);
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -68,10 +72,27 @@ public class HomeManager {
                         homes.put(e.getKey(), new Location(world, d.x, d.y, d.z, d.yaw, d.pitch));
                     }
 
-                    homeCache.put(uuid, new ConcurrentHashMap<>(homes));
-                    publicCache.put(uuid, new ConcurrentHashMap<>(publicStatus));
-                    favoriteCache.put(uuid, new ConcurrentHashMap<>(favoriteStatus));
-                    memoCache.put(uuid, new ConcurrentHashMap<>(memos));
+                    Map<String, Location> cacheHomes = homeCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
+                    for (Map.Entry<String, Location> e : homes.entrySet()) {
+                        cacheHomes.putIfAbsent(e.getKey(), e.getValue());
+                    }
+
+                    Map<String, Boolean> cachePublic = publicCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
+                    for (Map.Entry<String, Boolean> e : publicStatus.entrySet()) {
+                        cachePublic.putIfAbsent(e.getKey(), e.getValue());
+                    }
+
+                    Map<String, Boolean> cacheFavorite = favoriteCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
+                    for (Map.Entry<String, Boolean> e : favoriteStatus.entrySet()) {
+                        cacheFavorite.putIfAbsent(e.getKey(), e.getValue());
+                    }
+
+                    Map<String, String> cacheMemo = memoCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>());
+                    for (Map.Entry<String, String> e : memos.entrySet()) {
+                        cacheMemo.putIfAbsent(e.getKey(), e.getValue());
+                    }
+
+                    loaded.add(uuid);
                 });
             }
         }.runTaskAsynchronously(plugin);
@@ -83,6 +104,7 @@ public class HomeManager {
         publicCache.remove(uuid);
         favoriteCache.remove(uuid);
         memoCache.remove(uuid);
+        loaded.remove(uuid);
     }
     
     // Async set home
@@ -264,11 +286,14 @@ public class HomeManager {
     
     public Map<String, Location> getHomes(UUID uuid) {
         Map<String, Location> homes = homeCache.get(uuid);
-        if (homes != null) {
+        if (homes != null && loaded.contains(uuid)) {
             return new ConcurrentHashMap<>(homes);
         }
-        // Fallback
-        return databaseManager.getHomes(uuid);
+        Map<String, Location> fromDb = databaseManager.getHomes(uuid);
+        if (homes != null && !homes.isEmpty()) {
+            fromDb.putAll(homes);
+        }
+        return fromDb;
     }
 
     public boolean hasHome(Player player, String name) {
@@ -308,6 +333,7 @@ public class HomeManager {
         publicCache.clear();
         favoriteCache.clear();
         memoCache.clear();
+        loaded.clear();
         for (Player p : plugin.getServer().getOnlinePlayers()) {
             loadHomes(p.getUniqueId());
         }

@@ -54,7 +54,7 @@ You can configure settings in `config.yml`.
 
 ```yaml
 settings:
-  default-home-limit: 1  # Maximum homes per player
+  default-home-limit: 3  # Maximum homes per player
   teleport-delay: 3      # Teleport warmup in seconds
   
   # TPA Settings
@@ -132,7 +132,7 @@ Developed by **naonao**.
 
 ```yaml
 settings:
-  default-home-limit: 1  # デフォルトのホーム作成上限数
+  default-home-limit: 3  # デフォルトのホーム作成上限数
   teleport-delay: 3      # テレポート待機時間（秒）
   
   # TPA設定

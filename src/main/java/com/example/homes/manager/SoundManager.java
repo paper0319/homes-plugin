@@ -58,6 +58,11 @@ public class SoundManager {
         String normalized = raw.trim();
         if (normalized.isEmpty()) return null;
 
+        try {
+            return Sound.valueOf(normalized.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+        }
+
         String lower = normalized.toLowerCase(Locale.ROOT);
         NamespacedKey key = NamespacedKey.fromString(lower);
         if (key != null) {

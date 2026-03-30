@@ -201,6 +201,11 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
 
+            if (!homeManager.canSetHome(player)) {
+                player.sendMessage(getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
+                return true;
+            }
+
             // Check economy for creating home
             if (economyManager != null && economyManager.hasEconomy()) {
                 double cost = getConfig().getDouble("economy.cost.set-home", 0);

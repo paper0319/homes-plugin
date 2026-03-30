@@ -1,5 +1,5 @@
 settings:
-  default-home-limit: 1
+  default-home-limit: 3
   # OP/管理者権限を持つプレイヤーのホーム上限 (デフォルト: 100)
   # -1 に設定すると無制限になります（実際にはInteger.MAX_VALUE）
   op-home-limit: 100
@@ -172,6 +172,8 @@ messages:
   back-success: "&a死亡地点に戻りました。"
   back-no-location: "&c戻る場所がありません。"
   back-feature-disabled: "&c/back コマンドは無効化されています。"
+  back-death-title: "&c死亡しましたか？"
+  back-death-subtitle: "&a/back &eで戻れます"
   reload-success: "&a設定をリロードしました。"
   enter-name: "&aホームの名前を入力してください。"
   enter-search: "&a検索する文字を入力してください。(clearで解除)"
