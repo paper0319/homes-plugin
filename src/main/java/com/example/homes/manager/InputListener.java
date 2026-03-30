@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.HomeGUI;
@@ -78,6 +79,20 @@ public class InputListener implements Listener {
         player.sendMessage(plugin.getMessage("cancel-info"));
         player.closeInventory();
         soundManager.play(player, "gui-click");
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+    public void onChatLegacy(AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        if (!sessionManager.isCreatingHome(uuid) && !sessionManager.isSearchingHomes(uuid) && sessionManager.getEditingMemoTarget(uuid) == null && sessionManager.getRenamingTarget(uuid) == null) {
+            return;
+        }
+        String message = event.getMessage() == null ? "" : event.getMessage().trim();
+        event.setCancelled(true);
+        event.getRecipients().clear();
+        event.setMessage("");
+        plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
     }
 
     @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
