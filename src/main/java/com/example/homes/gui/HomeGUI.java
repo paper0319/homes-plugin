@@ -726,7 +726,22 @@ public class HomeGUI implements Listener {
                 
                 Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
                 List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
+                String query = sessionManager.getSearchQuery(viewer.getUniqueId());
+                if (query != null && !query.isEmpty()) {
+                    String qLower = query.toLowerCase();
+                    visibleHomes.removeIf(n -> !n.toLowerCase().contains(qLower));
+                }
                 Collections.sort(visibleHomes);
+                boolean isOwnerClick = viewer.getUniqueId().equals(target.getUniqueId());
+                if (isOwnerClick) {
+                    UUID targetUuid = target.getUniqueId();
+                    visibleHomes.sort((a, b) -> {
+                        boolean af = homeManager.isFavorite(targetUuid, a);
+                        boolean bf = homeManager.isFavorite(targetUuid, b);
+                        if (af != bf) return af ? -1 : 1;
+                        return a.compareToIgnoreCase(b);
+                    });
+                }
                 
                 int startIndex = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
                 boolean hasPrev = !sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty();
