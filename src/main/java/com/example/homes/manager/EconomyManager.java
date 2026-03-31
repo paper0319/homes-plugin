@@ -30,6 +30,9 @@ public class EconomyManager {
     }
 
     public boolean hasEconomy() {
+        if (!plugin.getConfig().getBoolean("economy.enabled", true)) {
+            return false;
+        }
         return economy != null;
     }
 
