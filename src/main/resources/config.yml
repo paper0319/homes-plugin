@@ -9,18 +9,17 @@ settings:
   safe-teleport:
     search-radius: 2
     vertical-range: 3
-  # TPA Settings
+  # === TPA (テレポートリクエスト) 設定 ===
   tpa:
-    enabled: true
-    back-on-teleport: true # Save location to /back when using TPA
-    cooldown: 60 # TPA cooldown in seconds
-  # Back Settings
+    enabled: true       # TPAコマンド (/tpa, /tpahere 等) を有効にするか
+    cooldown: 60        # TPA送信後のクールダウン (秒)
+
+  # === /back コマンド 設定 ===
   back:
-    enabled: true
-    save-death-location: true # Allow /back to return to death location
+    enabled: true              # /back コマンドを有効にするか (テレポート前・死亡地点の保存も含む)
 
 economy:
-  enabled: true
+  enabled: false
   cost:
     set-home: 1000.0
     teleport: 50.0

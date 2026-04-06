@@ -38,35 +38,32 @@ public class TeleportManager {
     }
 
     private void teleport(Player player, Object target) {
-        // Save current location to back before teleporting
-        if (tpaManager != null) {
-            tpaManager.saveLastLocation(player);
-        }
-        
         int delay = plugin.getConfig().getInt("settings.teleport-delay", 5);
-        
+
         if (delay <= 0) {
+            // Save location right before actual teleport
+            saveLocationBeforeTeleport(player);
             if (doTeleport(player, target)) {
                 player.sendMessage(plugin.getMessage("teleport-success"));
                 soundManager.play(player, "teleport-success");
             }
             return;
         }
-        
+
         player.sendMessage(plugin.getMessage("teleport-start").replace("{seconds}", String.valueOf(delay)));
-        
+
         Location initialLoc = player.getLocation();
-        
+
         new BukkitRunnable() {
             int timeLeft = delay;
-            
+
             @Override
             public void run() {
                 if (!player.isOnline()) {
                     this.cancel();
                     return;
                 }
-                
+
                 // Check movement
                 if (player.getLocation().distance(initialLoc) > 0.1) {
                     player.sendMessage(plugin.getMessage("teleport-cancelled"));
@@ -74,8 +71,10 @@ public class TeleportManager {
                     this.cancel();
                     return;
                 }
-                
+
                 if (timeLeft <= 0) {
+                    // Save location right before actual teleport (not during countdown)
+                    saveLocationBeforeTeleport(player);
                     if (doTeleport(player, target)) {
                         player.sendMessage(plugin.getMessage("teleport-success"));
                         soundManager.play(player, "teleport-success");
@@ -92,6 +91,12 @@ public class TeleportManager {
                 }
             }
         }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    private void saveLocationBeforeTeleport(Player player) {
+        if (tpaManager == null) return;
+        if (!plugin.getConfig().getBoolean("settings.back.enabled", true)) return;
+        tpaManager.saveLastLocation(player);
     }
     
     private boolean doTeleport(Player player, Object target) {
