@@ -573,8 +573,12 @@ public class HomeGUI implements Listener {
         OfflinePlayer target = viewer;
         if (title.contains("のホーム")) {
             String targetName = title.replace("のホーム", "");
-            // Try to find offline player
-            target = Bukkit.getOfflinePlayer(targetName); 
+            UUID targetUuid = homeManager.resolveOwnerUuid(targetName);
+            if (targetUuid == null) {
+                viewer.closeInventory();
+                return;
+            }
+            target = Bukkit.getOfflinePlayer(targetUuid);
         }
         
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());

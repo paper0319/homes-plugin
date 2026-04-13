@@ -43,6 +43,7 @@ public class HomeManager {
     private final Set<UUID> loaded = ConcurrentHashMap.newKeySet();
     private final Map<UUID, CompletableFuture<Void>> loading = new ConcurrentHashMap<>();
     private volatile List<String> cachedPlayersWithPublicHomes = Collections.emptyList();
+    private volatile Map<String, UUID> cachedPublicHomeNameToUuid = Collections.emptyMap();
 
     public HomeManager(HomesPlugin plugin) {
         this.plugin = plugin;
@@ -350,16 +351,51 @@ public class HomeManager {
                 List<UUID> uuids = databaseManager.getPlayerUuidsWithPublicHomes();
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     List<String> players = new ArrayList<>();
+                    Map<String, UUID> nameToUuid = new HashMap<>();
                     for (UUID uuid : uuids) {
                         OfflinePlayer op = plugin.getServer().getOfflinePlayer(uuid);
                         if (op.getName() != null) {
                             players.add(op.getName());
+                            nameToUuid.put(op.getName().toLowerCase(), uuid);
                         }
                     }
                     cachedPlayersWithPublicHomes = players;
+                    cachedPublicHomeNameToUuid = nameToUuid;
                 });
             }
         }.runTaskAsynchronously(plugin);
+    }
+
+    // Resolve a player's UUID by name, robust to offline targets whose name is
+    // not in the server's username cache. Falls back through online players,
+    // the public-homes cache (UUIDs known via DB), and Bukkit's offline cache.
+    public UUID resolveOwnerUuid(String name) {
+        if (name == null || name.isEmpty()) return null;
+        Player online = plugin.getServer().getPlayerExact(name);
+        if (online != null) return online.getUniqueId();
+        if (cachedPublicHomeNameToUuid.isEmpty()) {
+            // Block briefly on a refresh so first-use after restart works.
+            try {
+                List<UUID> uuids = databaseManager.getPlayerUuidsWithPublicHomes();
+                Map<String, UUID> nameToUuid = new HashMap<>();
+                List<String> players = new ArrayList<>();
+                for (UUID uuid : uuids) {
+                    OfflinePlayer op = plugin.getServer().getOfflinePlayer(uuid);
+                    if (op.getName() != null) {
+                        players.add(op.getName());
+                        nameToUuid.put(op.getName().toLowerCase(), uuid);
+                    }
+                }
+                cachedPlayersWithPublicHomes = players;
+                cachedPublicHomeNameToUuid = nameToUuid;
+            } catch (RuntimeException ignored) {
+            }
+        }
+        UUID byPublic = cachedPublicHomeNameToUuid.get(name.toLowerCase());
+        if (byPublic != null) return byPublic;
+        OfflinePlayer op = plugin.getServer().getOfflinePlayer(name);
+        if (op.hasPlayedBefore()) return op.getUniqueId();
+        return null;
     }
 
     public CompletableFuture<Map<String, Location>> getHomesAsync(UUID uuid) {

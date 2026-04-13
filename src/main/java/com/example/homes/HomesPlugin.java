@@ -1,5 +1,7 @@
 package com.example.homes;
 
+import java.util.UUID;
+
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -335,11 +337,12 @@ public class HomesPlugin extends JavaPlugin {
             }
 
             String targetName = args[0];
-            OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
-            if (!target.hasPlayedBefore() && !target.isOnline()) {
+            UUID targetUuid = homeManager.resolveOwnerUuid(targetName);
+            if (targetUuid == null) {
                 sender.sendMessage(getMessage("player-not-found"));
                 return true;
             }
+            OfflinePlayer target = Bukkit.getOfflinePlayer(targetUuid);
 
             // If viewing self, just use standard open
             if (target.getUniqueId().equals(player.getUniqueId())) {
