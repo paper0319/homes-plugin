@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Read version from pom.xml
+        id: version
+        run: |
+          VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build with Maven
+        run: mvn -B -DskipTests package
+
+      - name: Locate jar
+        id: jar
+        run: |
+          JAR=$(ls target/HomesPlugin-${{ steps.version.outputs.version }}.jar)
+          echo "path=$JAR" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to GitHub Release & Modrinth
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: BmLjlw32
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+
+          github-tag: ${{ github.ref_name }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-generate-changelog: true
+
+          files: ${{ steps.jar.outputs.path }}
+          name: HomesPlugin ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          version-type: release
+
+          loaders: |
+            paper
+            spigot
+            bukkit
+          game-versions: |
+            1.21
+            1.21.1
+            1.21.3
+            1.21.4
+          java: 21
