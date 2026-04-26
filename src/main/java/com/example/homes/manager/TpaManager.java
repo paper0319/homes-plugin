@@ -227,7 +227,7 @@ public class TpaManager {
             // This effectively creates a "swap" behavior for /back, which is desired.
             // No infinite loop risk because TeleportManager just calls saveLastLocation (put into map), not teleportBack recursively.
             
-            plugin.getTeleportManager().teleport(player, loc);
+            plugin.getTeleportManager().teleport(player, loc, true);
             player.sendMessage(plugin.getMessage("back-success"));
         } else {
             player.sendMessage(plugin.getMessage("back-no-location"));

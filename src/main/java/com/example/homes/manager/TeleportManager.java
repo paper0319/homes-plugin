@@ -30,20 +30,24 @@ public class TeleportManager {
     }
 
     public void teleport(Player player, Location target) {
-        teleport(player, (Object) target);
-    }
-    
-    public void teleport(Player player, Player target) {
-        teleport(player, (Object) target);
+        teleport(player, (Object) target, false);
     }
 
-    private void teleport(Player player, Object target) {
+    public void teleport(Player player, Location target, boolean allowWater) {
+        teleport(player, (Object) target, allowWater);
+    }
+
+    public void teleport(Player player, Player target) {
+        teleport(player, (Object) target, false);
+    }
+
+    private void teleport(Player player, Object target, boolean allowWater) {
         int delay = plugin.getConfig().getInt("settings.teleport-delay", 5);
 
         if (delay <= 0) {
             // Save location right before actual teleport
             saveLocationBeforeTeleport(player);
-            if (doTeleport(player, target)) {
+            if (doTeleport(player, target, allowWater)) {
                 player.sendMessage(plugin.getMessage("teleport-success"));
                 soundManager.play(player, "teleport-success");
             }
@@ -75,7 +79,7 @@ public class TeleportManager {
                 if (timeLeft <= 0) {
                     // Save location right before actual teleport (not during countdown)
                     saveLocationBeforeTeleport(player);
-                    if (doTeleport(player, target)) {
+                    if (doTeleport(player, target, allowWater)) {
                         player.sendMessage(plugin.getMessage("teleport-success"));
                         soundManager.play(player, "teleport-success");
                     }
@@ -99,7 +103,7 @@ public class TeleportManager {
         tpaManager.saveLastLocation(player);
     }
     
-    private boolean doTeleport(Player player, Object target) {
+    private boolean doTeleport(Player player, Object target, boolean allowWater) {
         return switch (target) {
             case Player targetPlayer -> {
                 if (targetPlayer.isOnline()) {
@@ -111,7 +115,7 @@ public class TeleportManager {
                 yield false;
             }
             case Location targetLocation -> {
-                Location safe = findSafeLocation(targetLocation);
+                Location safe = findSafeLocation(targetLocation, allowWater);
                 if (safe == null) {
                     player.sendMessage(plugin.getMessage("teleport-unsafe"));
                     soundManager.play(player, "teleport-fail");
@@ -134,7 +138,7 @@ public class TeleportManager {
         player.getWorld().playSound(loc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
     }
 
-    private Location findSafeLocation(Location target) {
+    private Location findSafeLocation(Location target, boolean allowWater) {
         if (target == null) return null;
         World world = target.getWorld();
         if (world == null) return null;
@@ -158,11 +162,11 @@ public class TeleportManager {
             int yDown = baseY - dy;
 
             if (yUp >= minY && yUp <= maxY) {
-                Location found = searchAround(world, baseX, yUp, baseZ, searchRadius, base.getYaw(), base.getPitch());
+                Location found = searchAround(world, baseX, yUp, baseZ, searchRadius, base.getYaw(), base.getPitch(), allowWater);
                 if (found != null) return found;
             }
             if (dy != 0 && yDown >= minY && yDown <= maxY) {
-                Location found = searchAround(world, baseX, yDown, baseZ, searchRadius, base.getYaw(), base.getPitch());
+                Location found = searchAround(world, baseX, yDown, baseZ, searchRadius, base.getYaw(), base.getPitch(), allowWater);
                 if (found != null) return found;
             }
         }
@@ -170,7 +174,7 @@ public class TeleportManager {
         return null;
     }
 
-    private Location searchAround(World world, int x, int y, int z, int radius, float yaw, float pitch) {
+    private Location searchAround(World world, int x, int y, int z, int radius, float yaw, float pitch, boolean allowWater) {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 int cx = x + dx;
@@ -178,7 +182,7 @@ public class TeleportManager {
 
                 world.getChunkAt(cx >> 4, cz >> 4);
 
-                if (isSafeStand(world, cx, y, cz)) {
+                if (isSafeStand(world, cx, y, cz, allowWater)) {
                     Location loc = new Location(world, cx + 0.5, y, cz + 0.5, yaw, pitch);
                     return loc;
                 }
@@ -187,7 +191,7 @@ public class TeleportManager {
         return null;
     }
 
-    private boolean isSafeStand(World world, int x, int y, int z) {
+    private boolean isSafeStand(World world, int x, int y, int z, boolean allowWater) {
         Block feet = world.getBlockAt(x, y, z);
         Block head = world.getBlockAt(x, y + 1, z);
         Block ground = world.getBlockAt(x, y - 1, z);
@@ -195,17 +199,19 @@ public class TeleportManager {
         if (!feet.isPassable()) return false;
         if (!head.isPassable()) return false;
 
-        if (isHazard(feet.getType()) || isHazard(head.getType())) return false;
+        if (isHazard(feet.getType(), allowWater) || isHazard(head.getType(), allowWater)) return false;
 
-        if (!ground.getType().isSolid()) return false;
-        if (isHazard(ground.getType())) return false;
+        boolean groundIsWater = ground.getType() == org.bukkit.Material.WATER;
+        if (!ground.getType().isSolid() && !(allowWater && groundIsWater)) return false;
+        if (isHazard(ground.getType(), allowWater)) return false;
 
         Block aboveHead = head.getRelative(BlockFace.UP);
         return !aboveHead.getType().isSolid();
     }
 
-    private boolean isHazard(org.bukkit.Material type) {
+    private boolean isHazard(org.bukkit.Material type, boolean allowWater) {
         if (type == null) return true;
+        if (allowWater && type == org.bukkit.Material.WATER) return false;
         return switch (type) {
             case LAVA, WATER, FIRE, SOUL_FIRE, CAMPFIRE, SOUL_CAMPFIRE, CACTUS, MAGMA_BLOCK, SWEET_BERRY_BUSH, POWDER_SNOW -> true;
             default -> false;
