@@ -52,13 +52,6 @@ jobs:
           version: ${{ steps.version.outputs.version }}
           version-type: release
 
-          loaders: |
-            paper
-            spigot
-            bukkit
-          game-versions: |
-            1.21
-            1.21.1
-            1.21.3
-            1.21.4
+          loaders: paper
+          game-versions: ">=1.21 <1.22"
           java: 21
