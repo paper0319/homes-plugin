@@ -26,6 +26,7 @@ import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
 import com.example.homes.manager.TeleportManager;
 import com.example.homes.manager.TpaManager;
+import com.example.homes.manager.UpdateChecker;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -48,6 +49,7 @@ public class HomesPlugin extends JavaPlugin {
     private DataListener dataListener;
     private DeathListener deathListener;
     private SessionCleanupListener sessionCleanupListener;
+    private UpdateChecker updateChecker;
 
     private volatile int maxHomeNameLength = 32;
     private volatile int maxHomeMemoLength = 15;
@@ -117,6 +119,12 @@ public class HomesPlugin extends JavaPlugin {
         setTabCompleter("tpaignore", tabCompleter);
         setTabCompleter("tpatoggle", tabCompleter);
         setTabCompleter("back", tabCompleter);
+
+        if (getConfig().getBoolean("settings.update-check.enabled", true)) {
+            this.updateChecker = new UpdateChecker(this);
+            getServer().getPluginManager().registerEvents(updateChecker, this);
+            this.updateChecker.checkAsync();
+        }
 
         // Initialize bStats
         int pluginId = 30475; // Registered bStats plugin ID
