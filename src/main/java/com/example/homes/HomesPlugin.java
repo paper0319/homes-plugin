@@ -52,6 +52,10 @@ public class HomesPlugin extends JavaPlugin {
         return teleportManager;
     }
 
+    public TpaManager getTpaManager() {
+        return tpaManager;
+    }
+
     @Override
     public void onEnable() {
         // Save default config
