@@ -18,6 +18,10 @@ settings:
   back:
     enabled: true              # /back コマンドを有効にするか (テレポート前・死亡地点の保存も含む)
 
+  # === アップデートチェック設定 ===
+  update-check:
+    enabled: true       # Modrinthから最新版を確認してOPに通知するか
+
 economy:
   enabled: false
   cost:
@@ -227,3 +231,9 @@ messages:
   usage-sethome: "&c使用法: /sethome <名前>"
   usage-delhome: "&c使用法: /delhome <名前>"
   home-exists: "&cその名前のホームは既に存在します。"
+  # Update Checker Messages
+  update-available-header: "&6[homes] &a更新があります！"
+  update-available-current: "&7現在のバージョン &f{current}"
+  update-available-latest: "&7新しいバージョン &e{latest}"
+  update-available-link: "&b【Modrinthで表示】"
+  update-available-link-hover: "&7Modrinthで開く"
