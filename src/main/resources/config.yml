@@ -123,6 +123,41 @@ gui:
       name: "&cいいえ、キャンセルします"
       lore:
         - "&7ホーム一覧に戻ります"
+  tpa:
+    title: "&aTPAリクエスト一覧"
+    title-page-suffix: " [{page}/{total}]"
+    border-material: BLUE_STAINED_GLASS_PANE
+    refresh-button:
+      material: EMERALD_BLOCK
+      name: "&a更新"
+      lore:
+        - "&7オンラインリストを再取得"
+    prev-button:
+      material: ARROW
+      name: "&a← 前のページ"
+    next-button:
+      material: ARROW
+      name: "&a次のページ →"
+    head:
+      name: "&e{player}"
+      lore:
+        - "&7クリックして選択"
+  tpa-action:
+    title: "&a{player}にリクエスト"
+    border-material: BLUE_STAINED_GLASS_PANE
+    tpa-button:
+      material: LIGHT_BLUE_WOOL
+      name: "&b/TPA"
+      lore:
+        - "&7あなたが {player} のところへ移動"
+    tpahere-button:
+      material: LIME_WOOL
+      name: "&a/TPAHere"
+      lore:
+        - "&7{player} をあなたのところへ呼ぶ"
+    back-button:
+      material: ARROW
+      name: "&c← 戻る"
 
 messages:
   prefix: "&6[Homes] &r"
@@ -166,6 +201,7 @@ messages:
   tpa-accepted-target: "&a{player} のリクエストを承認しました。"
   tpa-feature-disabled: "&cこの機能は現在無効化されています。"
   tpa-cooldown: "&cTPAを使用するにはあと {seconds} 秒待ってください。"
+  tpa-no-online-players: "&c他にオンラインのプレイヤーがいません。"
   # Back Messages
   back-success: "&a死亡地点に戻りました。"
   back-no-location: "&c戻る場所がありません。"
