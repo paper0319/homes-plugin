@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -27,6 +29,27 @@ jobs:
         run: |
           VERSION=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog from commits since previous tag
+        id: changelog
+        run: |
+          PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${{ github.ref_name }}$" | head -n 1)
+          if [ -n "$PREV" ]; then
+            LOG=$(git log --pretty=format:"- %s" "$PREV..${{ github.ref_name }}")
+            RANGE="$PREV..${{ github.ref_name }}"
+          else
+            LOG=$(git log --pretty=format:"- %s" "${{ github.ref_name }}")
+            RANGE="(initial release)"
+          fi
+          echo "Changes for $RANGE:" >&2
+          echo "$LOG" >&2
+          {
+            echo "body<<__EOF__"
+            echo "## Changes"
+            echo ""
+            echo "$LOG"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build with Maven
         run: mvn -B -DskipTests package
@@ -45,7 +68,8 @@ jobs:
 
           github-tag: ${{ github.ref_name }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-generate-changelog: true
+
+          changelog: ${{ steps.changelog.outputs.body }}
 
           files: ${{ steps.jar.outputs.path }}
           name: HomesPlugin ${{ steps.version.outputs.version }}
