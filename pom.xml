@@ -5,7 +5,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>HomesPlugin</artifactId>
-    <version>1.10.1</version>
+    <version>1.11.0</version>
     <packaging>jar</packaging>
 
     <name>HomesPlugin</name>
