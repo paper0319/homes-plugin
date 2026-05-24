@@ -13,6 +13,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.example.homes.gui.HomeGUI;
+import com.example.homes.gui.TpaActionGUI;
+import com.example.homes.gui.TpaGUI;
 import com.example.homes.manager.DataListener;
 import com.example.homes.manager.DeathListener;
 import com.example.homes.manager.EconomyManager;
@@ -37,6 +39,8 @@ public class HomesPlugin extends JavaPlugin {
     private SessionManager sessionManager;
     private TeleportManager teleportManager;
     private HomeGUI homeGUI;
+    private TpaGUI tpaGUI;
+    private TpaActionGUI tpaActionGUI;
     private InputListener inputListener;
     private SoundManager soundManager;
     private EconomyManager economyManager;
@@ -75,6 +79,9 @@ public class HomesPlugin extends JavaPlugin {
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager); // Pass tpaManager
         this.inputListener = new InputListener(this, homeManager, sessionManager, soundManager);
         this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);
+        this.tpaGUI = new TpaGUI(this);
+        this.tpaActionGUI = new TpaActionGUI(this, tpaGUI);
+        this.tpaGUI.setTpaActionGUI(tpaActionGUI);
         this.dataListener = new DataListener(homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
         this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager);
@@ -88,6 +95,8 @@ public class HomesPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(dataListener, this);
         getServer().getPluginManager().registerEvents(deathListener, this);
         getServer().getPluginManager().registerEvents(sessionCleanupListener, this);
+        getServer().getPluginManager().registerEvents(tpaGUI, this);
+        getServer().getPluginManager().registerEvents(tpaActionGUI, this);
 
         // Register TabCompleter
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
@@ -372,7 +381,10 @@ public class HomesPlugin extends JavaPlugin {
                 player.sendMessage(getMessage("tpa-feature-disabled"));
                 return true;
             }
-            if (args.length == 0) return false;
+            if (args.length == 0) {
+                tpaGUI.open(player);
+                return true;
+            }
             Player target = Bukkit.getPlayer(args[0]);
             if (target == null) {
                 player.sendMessage(getMessage("player-not-found"));
@@ -391,7 +403,10 @@ public class HomesPlugin extends JavaPlugin {
                 player.sendMessage(getMessage("tpa-feature-disabled"));
                 return true;
             }
-            if (args.length == 0) return false;
+            if (args.length == 0) {
+                tpaGUI.open(player);
+                return true;
+            }
             Player target = Bukkit.getPlayer(args[0]);
             if (target == null) {
                 player.sendMessage(getMessage("player-not-found"));
