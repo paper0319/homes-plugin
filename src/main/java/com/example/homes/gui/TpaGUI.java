@@ -138,7 +138,9 @@ public class TpaGUI implements Listener {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta meta = head.getItemMeta();
         if (meta instanceof SkullMeta sm) {
-            sm.setOwningPlayer(target);
+            // Use the live PlayerProfile so Bedrock skins applied by
+            // GeyserSkinManager (when installed) are picked up automatically.
+            sm.setOwnerProfile(target.getPlayerProfile());
         }
         if (meta != null) {
             String nameTmpl = plugin.getConfig().getString("gui.tpa.head.name", "&e{player}");
