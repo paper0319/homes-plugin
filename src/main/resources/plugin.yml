@@ -52,7 +52,14 @@ permissions:
   homes.admin:
     description: 他人のホームを閲覧・管理する権限
     default: op
+  # ホーム数の個別上限。LuckPerms 等で付与して使います:
+  #   homes.limit.<数字>    例: homes.limit.10 で最大10個
+  #   homes.limit.unlimited 無制限
+  # default: false なので、付与しなければ settings.default-home-limit が適用されます (OPも同様)。
+  homes.limit.unlimited:
+    description: ホーム数を無制限にする
+    default: false
   homes.limit.*:
-    description: ホーム作成数の制限
-    default: op
+    description: ホーム数を無制限にする (homes.limit.unlimited と同等)
+    default: false
 

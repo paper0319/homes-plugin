@@ -54,20 +54,31 @@ You can configure settings in `config.yml`.
 
 ```yaml
 settings:
-  default-home-limit: 3  # Maximum homes per player
-  teleport-delay: 3      # Teleport warmup in seconds
-  
-  # TPA Settings
+  language: ja           # Language file: lang/<language>.yml (ja / en bundled)
+
+  # Base home limit applied to everyone (including OPs) without a limit permission.
+  default-home-limit: 3
+  # Override per player/group with LuckPerms (not in config):
+  #   homes.limit.<number>  e.g. homes.limit.10 -> up to 10 homes
+  #   homes.limit.unlimited -> no limit
+
+  teleport:
+    delay: 3             # Warmup in seconds (0 = instant)
+    confirm-unsafe: true # Dangerous home: true = ask & teleport when player types "confirm", false = cancel
+    safe-search:         # Advanced: range used to find a safe landing spot
+      radius: 2          # Horizontal radius (blocks)
+      vertical: 3        # Vertical range (blocks)
+
   tpa:
     enabled: true        # Enable TPA system
-    back-on-teleport: true # Save location to /back when using TPA
     cooldown: 60         # TPA cooldown in seconds
-
-  # Back Settings
   back:
     enabled: true        # Enable /back command
-    save-death-location: true # Save death location to /back
+  update-check:
+    enabled: true        # Notify OPs when a Modrinth update is available
 ```
+
+Per-player home limits are controlled by permissions (e.g. via LuckPerms): grant `homes.limit.<number>` or `homes.limit.unlimited`. Without one, the player uses `default-home-limit`.
 
 ### 📥 Installation
 
@@ -132,19 +143,28 @@ Developed by **naonao**.
 
 ```yaml
 settings:
-  default-home-limit: 3  # デフォルトのホーム作成上限数
-  teleport-delay: 3      # テレポート待機時間（秒）
-  
-  # TPA設定
+  language: ja           # 表示言語ファイル lang/<language>.yml (ja / en 同梱)
+
+  # 全員共通の基本ホーム上限 (権限が無ければ OP もこの値)
+  default-home-limit: 3
+  # 個別に変えたい場合は LuckPerms 等で権限付与 (configでは設定しません):
+  #   homes.limit.<数字>    例: homes.limit.10 → 最大10個
+  #   homes.limit.unlimited → 無制限
+
+  teleport:
+    delay: 3             # テレポート待機秒数 (0で即時)
+    confirm-unsafe: true # 危険な場所: true=確認してチャットconfirmで強行, false=中止
+    safe-search:         # 【上級者向け】安全な着地点の探索範囲
+      radius: 2          # 水平方向の半径(ブロック)
+      vertical: 3        # 上下方向の範囲(ブロック)
+
   tpa:
     enabled: true        # TPA機能を有効にするか
-    back-on-teleport: true # TPA使用時に移動元を/backに保存するか
     cooldown: 60         # TPAのクールダウン（秒）
-
-  # Back設定
   back:
     enabled: true        # Back機能を有効にするか
-    save-death-location: true # 死亡地点を/backに保存するか
+  update-check:
+    enabled: true        # Modrinthの更新をOPに通知するか
 ```
 
 ### 📥 インストール

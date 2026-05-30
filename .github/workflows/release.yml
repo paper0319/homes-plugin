@@ -33,6 +33,7 @@ jobs:
       - name: Generate changelog from commits since previous tag
         id: changelog
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           PREV=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${{ github.ref_name }}$" | head -n 1)
           if [ -n "$PREV" ]; then
             LOG=$(git log --pretty=format:"- %s" "$PREV..${{ github.ref_name }}")
@@ -43,8 +44,20 @@ jobs:
           fi
           echo "Changes for $RANGE:" >&2
           echo "$LOG" >&2
+          # Optional upgrade note: shown only when .github/release-notes.md targets this version
+          NOTE=""
+          if [ -f .github/release-notes.md ]; then
+            NOTE_VERSION=$(head -n 1 .github/release-notes.md)
+            if [ "$NOTE_VERSION" = "$VERSION" ]; then
+              NOTE=$(tail -n +2 .github/release-notes.md)
+            fi
+          fi
           {
             echo "body<<__EOF__"
+            if [ -n "$NOTE" ]; then
+              echo "$NOTE"
+              echo ""
+            fi
             echo "## Changes"
             echo ""
             echo "$LOG"

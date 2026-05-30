@@ -51,7 +51,7 @@ public class TeleportManager {
         // 新しいテレポート試行が始まったら、以前の確認待ちは破棄する
         pendingUnsafe.remove(player.getUniqueId());
 
-        int delay = plugin.getConfig().getInt("settings.teleport-delay", 5);
+        int delay = plugin.getConfig().getInt("settings.teleport.delay", 3);
 
         if (delay <= 0) {
             // Save location right before actual teleport
@@ -163,7 +163,7 @@ public class TeleportManager {
             case Location targetLocation -> {
                 Location safe = findSafeLocation(targetLocation, allowWater);
                 if (safe == null) {
-                    if (plugin.getConfig().getBoolean("settings.safe-teleport.confirm-unsafe", true)) {
+                    if (plugin.getConfig().getBoolean("settings.teleport.confirm-unsafe", true)) {
                         // 危険でも確認後にテレポートできるよう、目的地を保留する
                         pendingUnsafe.put(player.getUniqueId(), targetLocation.clone());
                         player.sendMessage(plugin.getMessage("teleport-unsafe-confirm"));
@@ -207,8 +207,8 @@ public class TeleportManager {
         int baseY = Math.max(minY, Math.min(maxY, base.getBlockY()));
         int baseZ = base.getBlockZ();
 
-        int searchRadius = plugin.getConfig().getInt("settings.safe-teleport.search-radius", 2);
-        int verticalRange = plugin.getConfig().getInt("settings.safe-teleport.vertical-range", 3);
+        int searchRadius = plugin.getConfig().getInt("settings.teleport.safe-search.radius", 2);
+        int verticalRange = plugin.getConfig().getInt("settings.teleport.safe-search.vertical", 3);
 
         for (int dy = 0; dy <= verticalRange; dy++) {
             int yUp = baseY + dy;

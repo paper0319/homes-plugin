@@ -15,6 +15,7 @@ import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
@@ -298,22 +299,46 @@ public class HomeManager {
         return getHome(player, name) != null;
     }
 
-    public int getMaxHomes(Player player) {
-        // Check permissions from 100 down to 1
-        // Note: OPs usually have all permissions, so they might match homes.limit.100 if we check loop first.
-        // So we should check specific OP config first if we want to control OP limit separately.
-        
-        if (player.isOp()) {
-            return plugin.getConfig().getInt("settings.op-home-limit", 100);
-        }
+    /** ホーム作成数を表す権限の接頭辞。例: homes.limit.10 / homes.limit.unlimited */
+    private static final String LIMIT_PREFIX = "homes.limit.";
 
-        for (int i = 100; i >= 1; i--) {
-            if (player.hasPermission("homes.limit." + i)) {
-                return i;
+    /**
+     * プレイヤーのホーム作成上限を返す。
+     *
+     * 優先順位:
+     *   1. homes.limit.unlimited または homes.limit.* を持つ → 無制限
+     *   2. homes.limit.&lt;数字&gt; を持つ → そのうち最大の数値
+     *   3. いずれも無い → settings.default-home-limit
+     *
+     * OP は未定義権限を全て持ってしまうため hasPermission ではなく
+     * getEffectivePermissions() を走査し、明示的に付与されたノードだけを見る。
+     * (homes.limit.* / homes.limit.unlimited は plugin.yml で default:false 宣言)
+     */
+    public int getMaxHomes(Player player) {
+        boolean unlimited = false;
+        int maxFromPerm = -1;
+
+        for (PermissionAttachmentInfo info : player.getEffectivePermissions()) {
+            if (!info.getValue()) continue;
+            String perm = info.getPermission();
+            if (perm == null || !perm.startsWith(LIMIT_PREFIX)) continue;
+
+            String suffix = perm.substring(LIMIT_PREFIX.length());
+            if (suffix.equals("unlimited") || suffix.equals("*")) {
+                unlimited = true;
+            } else {
+                try {
+                    int n = Integer.parseInt(suffix);
+                    if (n > maxFromPerm) maxFromPerm = n;
+                } catch (NumberFormatException ignored) {
+                    // homes.limit.<数字> 以外のノードは無視
+                }
             }
         }
-        // Fallback to config default
-        return plugin.getConfig().getInt("settings.default-home-limit", 1);
+
+        if (unlimited) return Integer.MAX_VALUE;
+        if (maxFromPerm >= 0) return maxFromPerm;
+        return plugin.getConfig().getInt("settings.default-home-limit", 3);
     }
 
     public boolean canSetHome(Player player) {

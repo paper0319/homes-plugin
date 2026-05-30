@@ -74,6 +74,8 @@ public class HomesPlugin extends JavaPlugin {
         saveDefaultConfig();
         // Update config with new keys if missing
         getConfig().options().copyDefaults(true);
+        // 旧バージョンのキーを新形式へ移行する
+        migrateLegacyConfig();
         saveConfig();
         reloadValidationSettings();
 
@@ -166,6 +168,55 @@ public class HomesPlugin extends JavaPlugin {
         String msg = languageManager != null ? languageManager.getString(key) : null;
         if (msg == null) return Component.text("Message not found: " + key);
         return LEGACY_AMPERSAND.deserialize(msg);
+    }
+
+    /**
+     * 旧バージョンの config キーを新しい構造へ移行する。
+     * 既存サーバーの設定値を保ったまま、不要になった旧キーを取り除く。
+     */
+    private void migrateLegacyConfig() {
+        org.bukkit.configuration.file.FileConfiguration cfg = getConfig();
+        boolean changed = false;
+
+        // settings.teleport-delay -> settings.teleport.delay
+        if (cfg.isSet("settings.teleport-delay")) {
+            cfg.set("settings.teleport.delay", cfg.getInt("settings.teleport-delay"));
+            cfg.set("settings.teleport-delay", null);
+            changed = true;
+        }
+        // settings.safe-teleport.* -> settings.teleport.*
+        if (cfg.isSet("settings.safe-teleport.search-radius")) {
+            cfg.set("settings.teleport.safe-search.radius", cfg.getInt("settings.safe-teleport.search-radius"));
+            changed = true;
+        }
+        if (cfg.isSet("settings.safe-teleport.vertical-range")) {
+            cfg.set("settings.teleport.safe-search.vertical", cfg.getInt("settings.safe-teleport.vertical-range"));
+            changed = true;
+        }
+        if (cfg.isSet("settings.safe-teleport.confirm-unsafe")) {
+            cfg.set("settings.teleport.confirm-unsafe", cfg.getBoolean("settings.safe-teleport.confirm-unsafe"));
+            changed = true;
+        }
+        if (cfg.isSet("settings.safe-teleport")) {
+            cfg.set("settings.safe-teleport", null);
+            changed = true;
+        }
+        // settings.op-home-limit は廃止 (OP も default-home-limit に従う)
+        if (cfg.isSet("settings.op-home-limit")) {
+            cfg.set("settings.op-home-limit", null);
+            changed = true;
+        }
+
+        if (changed) {
+            getLogger().info("============================================================");
+            getLogger().info(" 設定ファイル(config.yml)を新しい形式へ自動移行しました。");
+            getLogger().info(" 設定値はそのまま引き継いでいるので、動作に問題はありません。");
+            getLogger().info("");
+            getLogger().info(" より分かりやすい説明コメント付きの設定にしたい場合は、");
+            getLogger().info(" config.yml を一度削除して再生成することをおすすめします。");
+            getLogger().info(" (削除する前に、変更した設定値はメモしておいてください)");
+            getLogger().info("============================================================");
+        }
     }
 
     public void reloadValidationSettings() {
