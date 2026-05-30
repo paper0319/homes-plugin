@@ -90,5 +90,7 @@ jobs:
           version-type: release
 
           loaders: paper
-          game-versions: ">=1.21 <1.22"
+          game-versions: |
+            >=1.21 <1.22
+            26.1.2
           java: 21

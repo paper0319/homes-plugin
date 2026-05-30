@@ -61,7 +61,9 @@ public class SoundManager {
 
         try {
             return Sound.valueOf(normalized.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ignored) {
+        } catch (RuntimeException | LinkageError ignored) {
+            // 将来のバージョンで Sound が enum でなくなり valueOf が消えた場合 (NoSuchMethodError 等) も
+            // 下の Registry.SOUNDS フォールバックで解決させる
         }
 
         String lower = normalized.toLowerCase(Locale.ROOT);
