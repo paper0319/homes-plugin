@@ -72,7 +72,7 @@ public class HomeGUI implements Listener {
     
     public void open(Player viewer, OfflinePlayer target) {
         if (!homeManager.isLoaded(target.getUniqueId())) {
-            viewer.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+            viewer.sendMessage(plugin.getMessage("loading-homes"));
             homeManager.ensureLoaded(target.getUniqueId()).thenRun(() -> plugin.getServer().getScheduler().runTask(plugin, () -> open(viewer, target)));
             return;
         }

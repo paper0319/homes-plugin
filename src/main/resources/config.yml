@@ -1,4 +1,7 @@
 settings:
+  # 使用する言語ファイル (lang/<language>.yml)。同梱: ja, en
+  # 別言語を追加したい場合は lang/ フォルダに <language>.yml を作成してください。
+  language: ja
   default-home-limit: 3
   # OP/管理者権限を持つプレイヤーのホーム上限 (デフォルト: 100)
   # -1 に設定すると無制限になります（実際にはInteger.MAX_VALUE）
@@ -9,6 +12,10 @@ settings:
   safe-teleport:
     search-radius: 2
     vertical-range: 3
+    # 安全な場所が見つからない場合の挙動:
+    #   true  = 「危険ですがテレポートしますか？」と尋ね、チャットに confirm と入力すると強制テレポート
+    #   false = 従来通りテレポートを中止する
+    confirm-unsafe: true
   # === TPA (テレポートリクエスト) 設定 ===
   tpa:
     enabled: true       # TPAコマンド (/tpa, /tpahere 等) を有効にするか
@@ -163,77 +170,5 @@ gui:
       material: ARROW
       name: "&c← 戻る"
 
-messages:
-  prefix: "&6[Homes] &r"
-  no-permission: "&c権限がありません。"
-  only-player: "&cこのコマンドはプレイヤーのみ実行できます。"
-  home-set: "&aホーム &e{name} &aを設定しました。"
-  home-created: "&aホーム &e{name} &aを作成しました。"
-  home-deleted: "&cホーム &e{name} &cを削除しました。"
-  home-not-found: "&cそのホームは見つかりません。"
-  teleport-success: "&aテレポートしました！"
-  teleport-start: "&e{seconds}秒後にテレポートします..."
-  teleport-cancelled: "&c移動したためテレポートをキャンセルしました。"
-  teleport-unsafe: "&c危険な場所のためテレポートできませんでした。"
-  max-homes-reached: "&cこれ以上ホームを作成できません (最大: {max})"
-  invalid-name: "&cホーム名に使用できない文字が含まれています。"
-  player-not-found: "&cプレイヤーが見つかりません。"
-  admin-view: "&c管理者権限で {player} のホームを表示しています。"
-  insufficient-funds: "&cお金が足りません！ (必要: {cost})"
-  payment-success: "&a{cost} を支払いました。"
-  no-homes: "&cホームが設定されていません。"
-  # TPA Messages
-  tpa-sent: "&a{player} にテレポートリクエストを送信しました。"
-  tpa-received: "&a{player} からテレポートリクエストが届きました。"
-  tpahere-received: "&a{player} からカモン(呼び出し)リクエストが届きました。"
-  tpa-info: "&e/tpaccept &fで承認、&e/tpdeny &fで拒否します。"
-  tpa-expired-sender: "&e{player} へのリクエストが期限切れになりました。"
-  tpa-expired-receiver: "&e{player} からのリクエストが期限切れになりました。"
-  tpa-no-request: "&c保留中のリクエストはありません。"
-  tpa-request-denied: "&eリクエストを拒否しました。"
-  tpa-denied-sender: "&c{player} にリクエストを拒否されました。"
-  tpa-cancelled: "&aリクエストをキャンセルしました。"
-  tpa-no-target-request: "&cそのプレイヤーへのリクエストはありません。"
-  tpa-self: "&c自分自身にリクエストを送ることはできません。"
-  tpa-disabled: "&c{player} はテレポートリクエストを受け付けていません。"
-  tpa-ignored: "&c{player} はあなたのリクエストを無視しています。"
-  tpa-toggle-on: "&aテレポートリクエストを受け付けるようにしました。"
-  tpa-toggle-off: "&cテレポートリクエストを拒否するようにしました。"
-  tpa-ignore-add: "&c{player} を無視リストに追加しました。"
-  tpa-ignore-remove: "&a{player} の無視を解除しました。"
-  tpa-accepted: "&aリクエストが承認されました。"
-  tpa-accepted-target: "&a{player} のリクエストを承認しました。"
-  tpa-feature-disabled: "&cこの機能は現在無効化されています。"
-  tpa-cooldown: "&cTPAを使用するにはあと {seconds} 秒待ってください。"
-  tpa-no-online-players: "&c他にオンラインのプレイヤーがいません。"
-  # Back Messages
-  back-success: "&a死亡地点に戻りました。"
-  back-no-location: "&c戻る場所がありません。"
-  back-feature-disabled: "&c/back コマンドは無効化されています。"
-  back-death-title: "&c死亡しましたか？"
-  back-death-subtitle: "&a/back &eで戻れます"
-  reload-success: "&a設定をリロードしました。"
-  enter-name: "&aホームの名前を入力してください。"
-  enter-search: "&a検索する文字を入力してください。(clearで解除)"
-  search-cancelled: "&e検索をキャンセルしました。"
-  enter-memo: "&a{name} のメモを入力してください。(clearで削除)"
-  memo-updated: "&a{name} のメモを更新しました。"
-  memo-cleared: "&e{name} のメモを削除しました。"
-  memo-cancelled: "&eメモ編集をキャンセルしました。"
-  memo-too-long: "&cメモが長すぎます。(最大: {max})"
-  cancel-info: "&7キャンセルするには &c'cancel' &7と入力してください。"
-  enter-new-name: "&a{old} の新しい名前を入力してください。"
-  home-renamed: "&aホーム名を {old} から {new} に変更しました。"
-  rename-cancelled: "&eリネームをキャンセルしました。"
-  creation-cancelled: "&eホーム作成をキャンセルしました。"
-  usage-home: "&c使用法: /home <ホーム名>"
-  use-gui-info: "&e/homes コマンドでGUIからホームを選択できます。"
-  usage-sethome: "&c使用法: /sethome <名前>"
-  usage-delhome: "&c使用法: /delhome <名前>"
-  home-exists: "&cその名前のホームは既に存在します。"
-  # Update Checker Messages
-  update-available-header: "&8[&6&lHomes&r&8] &a&l更新があります！"
-  update-available-current: "&7現在のバージョン &f{current}"
-  update-available-latest: "&7新しいバージョン &e&l{latest}"
-  update-available-link: "&b&n【Modrinthで表示】"
-  update-available-link-hover: "&7Modrinthで開く"
+# メッセージ文言は lang/<language>.yml に移動しました。
+# config.yml の settings.language で言語を切り替えられます。

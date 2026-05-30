@@ -130,20 +130,20 @@ public class UpdateChecker implements Listener {
         Player player = event.getPlayer();
         if (!player.isOp()) return;
 
-        player.sendMessage(colorize(plugin.getConfig().getString(
-                "messages.update-available-header", "&6[homes] &a更新があります！")));
-        player.sendMessage(colorize(plugin.getConfig().getString(
-                "messages.update-available-current", "&7現在のバージョン &f{current}")
+        player.sendMessage(colorize(plugin.getLanguageManager().getString(
+                "update-available-header", "&6[homes] &a更新があります！")));
+        player.sendMessage(colorize(plugin.getLanguageManager().getString(
+                "update-available-current", "&7現在のバージョン &f{current}")
                 .replace("{current}", currentVersion)));
-        player.sendMessage(colorize(plugin.getConfig().getString(
-                "messages.update-available-latest", "&7新しいバージョン &e{latest}")
+        player.sendMessage(colorize(plugin.getLanguageManager().getString(
+                "update-available-latest", "&7新しいバージョン &e{latest}")
                 .replace("{latest}", latestVersion)));
 
-        Component link = colorize(plugin.getConfig().getString(
-                "messages.update-available-link", "&b【Modrinthで表示】"))
+        Component link = colorize(plugin.getLanguageManager().getString(
+                "update-available-link", "&b【Modrinthで表示】"))
                 .clickEvent(ClickEvent.openUrl(DOWNLOAD_PAGE_BASE + latestVersion))
-                .hoverEvent(HoverEvent.showText(colorize(plugin.getConfig().getString(
-                        "messages.update-available-link-hover", "&7Modrinthで開く"))));
+                .hoverEvent(HoverEvent.showText(colorize(plugin.getLanguageManager().getString(
+                        "update-available-link-hover", "&7Modrinthで開く"))));
         player.sendMessage(link);
     }
 

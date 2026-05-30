@@ -44,10 +44,8 @@ public class DeathListener implements Listener {
 
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             if (!event.getPlayer().isOnline()) return;
-            String titleStr = plugin.getConfig().getString("messages.back-death-title");
-            if (titleStr == null) titleStr = "&c死亡しましたか？";
-            String subtitleStr = plugin.getConfig().getString("messages.back-death-subtitle");
-            if (subtitleStr == null) subtitleStr = "&a/back &eで戻れます";
+            String titleStr = plugin.getLanguageManager().getString("back-death-title", "&c死亡しましたか？");
+            String subtitleStr = plugin.getLanguageManager().getString("back-death-subtitle", "&a/back &eで戻れます");
             Component title = LEGACY_AMPERSAND.deserialize(titleStr);
             Component subtitle = LEGACY_AMPERSAND.deserialize(subtitleStr);
             event.getPlayer().showTitle(Title.title(title, subtitle));

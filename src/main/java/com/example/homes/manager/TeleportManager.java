@@ -1,6 +1,9 @@
 package com.example.homes.manager;
 
 import java.time.Duration;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -23,6 +26,9 @@ public class TeleportManager {
     private final SoundManager soundManager;
     private final TpaManager tpaManager;
 
+    /** 危険な場所のため保留中の確認テレポート (プレイヤー → 元の目的地)。次のテレポート試行でクリアされる。 */
+    private final Map<UUID, Location> pendingUnsafe = new ConcurrentHashMap<>();
+
     public TeleportManager(HomesPlugin plugin, SoundManager soundManager, TpaManager tpaManager) {
         this.plugin = plugin;
         this.soundManager = soundManager;
@@ -42,6 +48,9 @@ public class TeleportManager {
     }
 
     private void teleport(Player player, Object target, boolean allowWater) {
+        // 新しいテレポート試行が始まったら、以前の確認待ちは破棄する
+        pendingUnsafe.remove(player.getUniqueId());
+
         int delay = plugin.getConfig().getInt("settings.teleport-delay", 5);
 
         if (delay <= 0) {
@@ -97,6 +106,43 @@ public class TeleportManager {
         }.runTaskTimer(plugin, 0L, 20L);
     }
 
+    /** プレイヤーに確認待ちの危険テレポートがあるか。 */
+    public boolean hasPendingConfirm(UUID uuid) {
+        return pendingUnsafe.containsKey(uuid);
+    }
+
+    /** 確認待ちの危険テレポートを破棄する。 */
+    public void clearPendingConfirm(UUID uuid) {
+        pendingUnsafe.remove(uuid);
+    }
+
+    /**
+     * 確認待ちの危険テレポートを実行する。安全地点の探索は行わず、ホームの正確な座標へテレポートする。
+     * @return 保留がありテレポートを実行した場合 true
+     */
+    public boolean confirmPending(Player player) {
+        Location target = pendingUnsafe.remove(player.getUniqueId());
+        if (target == null) {
+            return false;
+        }
+        if (target.getWorld() == null) {
+            player.sendMessage(plugin.getMessage("teleport-target-not-found"));
+            soundManager.play(player, "teleport-fail");
+            return false;
+        }
+
+        // /back 用に直前の位置を保存してから、ブロック中央へテレポートする
+        saveLocationBeforeTeleport(player);
+        Location exact = target.clone();
+        exact.setX(target.getBlockX() + 0.5);
+        exact.setZ(target.getBlockZ() + 0.5);
+        player.teleport(exact);
+        playTeleportEffect(player);
+        player.sendMessage(plugin.getMessage("teleport-success"));
+        soundManager.play(player, "teleport-success");
+        return true;
+    }
+
     private void saveLocationBeforeTeleport(Player player) {
         if (tpaManager == null) return;
         if (!plugin.getConfig().getBoolean("settings.back.enabled", true)) return;
@@ -111,14 +157,21 @@ public class TeleportManager {
                     playTeleportEffect(player);
                     yield true;
                 }
-                player.sendMessage(Component.text("テレポート先が見つかりません。", NamedTextColor.RED));
+                player.sendMessage(plugin.getMessage("teleport-target-not-found"));
                 yield false;
             }
             case Location targetLocation -> {
                 Location safe = findSafeLocation(targetLocation, allowWater);
                 if (safe == null) {
-                    player.sendMessage(plugin.getMessage("teleport-unsafe"));
-                    soundManager.play(player, "teleport-fail");
+                    if (plugin.getConfig().getBoolean("settings.safe-teleport.confirm-unsafe", true)) {
+                        // 危険でも確認後にテレポートできるよう、目的地を保留する
+                        pendingUnsafe.put(player.getUniqueId(), targetLocation.clone());
+                        player.sendMessage(plugin.getMessage("teleport-unsafe-confirm"));
+                        soundManager.play(player, "teleport-fail");
+                    } else {
+                        player.sendMessage(plugin.getMessage("teleport-unsafe"));
+                        soundManager.play(player, "teleport-fail");
+                    }
                     yield false;
                 }
                 player.teleport(safe);

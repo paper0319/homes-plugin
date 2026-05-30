@@ -21,6 +21,7 @@ import com.example.homes.manager.EconomyManager;
 import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.HomeTabCompleter;
 import com.example.homes.manager.InputListener;
+import com.example.homes.manager.LanguageManager;
 import com.example.homes.manager.SessionCleanupListener;
 import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
@@ -50,6 +51,7 @@ public class HomesPlugin extends JavaPlugin {
     private DeathListener deathListener;
     private SessionCleanupListener sessionCleanupListener;
     private UpdateChecker updateChecker;
+    private LanguageManager languageManager;
 
     private volatile int maxHomeNameLength = 32;
     private volatile int maxHomeMemoLength = 15;
@@ -62,6 +64,10 @@ public class HomesPlugin extends JavaPlugin {
         return tpaManager;
     }
 
+    public LanguageManager getLanguageManager() {
+        return languageManager;
+    }
+
     @Override
     public void onEnable() {
         // Save default config
@@ -70,6 +76,10 @@ public class HomesPlugin extends JavaPlugin {
         getConfig().options().copyDefaults(true);
         saveConfig();
         reloadValidationSettings();
+
+        // 言語ファイルの読み込み (メッセージ参照より前に行う)
+        this.languageManager = new LanguageManager(this);
+        this.languageManager.load();
 
         this.tpaManager = new TpaManager(this);
         
@@ -86,7 +96,7 @@ public class HomesPlugin extends JavaPlugin {
         this.tpaGUI.setTpaActionGUI(tpaActionGUI);
         this.dataListener = new DataListener(homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
-        this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager);
+        this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager, teleportManager);
         
         // Link GUI and Input Listener
         this.homeGUI.setInputListener(inputListener);
@@ -153,7 +163,7 @@ public class HomesPlugin extends JavaPlugin {
     }
 
     public Component getMessageComponent(String key) {
-        String msg = getConfig().getString("messages." + key);
+        String msg = languageManager != null ? languageManager.getString(key) : null;
         if (msg == null) return Component.text("Message not found: " + key);
         return LEGACY_AMPERSAND.deserialize(msg);
     }
@@ -193,6 +203,7 @@ public class HomesPlugin extends JavaPlugin {
             }
             reloadConfig();
             reloadValidationSettings();
+            languageManager.load();
             homeManager.reload();
             sender.sendMessage(getMessage("reload-success"));
             return true;
@@ -218,7 +229,7 @@ public class HomesPlugin extends JavaPlugin {
                 return true;
             }
             if (!homeManager.isLoaded(player.getUniqueId())) {
-                player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+                player.sendMessage(getMessage("loading-homes"));
             }
             homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes -> getServer().getScheduler().runTask(this, () -> {
                 if (homes.containsKey(homeName)) {
@@ -259,7 +270,7 @@ public class HomesPlugin extends JavaPlugin {
 
             String homeName = String.join(" ", args);
             if (!homeManager.isLoaded(player.getUniqueId())) {
-                player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+                player.sendMessage(getMessage("loading-homes"));
             }
             homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes -> getServer().getScheduler().runTask(this, () -> {
                 if (!homes.containsKey(homeName)) {
@@ -286,7 +297,7 @@ public class HomesPlugin extends JavaPlugin {
             String homeName = String.join(" ", args);
             
             if (!homeManager.isLoaded(player.getUniqueId())) {
-                player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+                player.sendMessage(getMessage("loading-homes"));
             }
             homeManager.getHomeAsync(player.getUniqueId(), homeName).thenAccept(loc -> getServer().getScheduler().runTask(this, () -> {
                 if (loc == null) {
@@ -318,7 +329,7 @@ public class HomesPlugin extends JavaPlugin {
             // /homes list
             if (args.length > 0 && args[0].equalsIgnoreCase("list")) {
                 if (!homeManager.isLoaded(player.getUniqueId())) {
-                    player.sendMessage(LEGACY_AMPERSAND.deserialize("&7ホームを読み込み中..."));
+                    player.sendMessage(getMessage("loading-homes"));
                 }
                 homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes -> getServer().getScheduler().runTask(this, () -> {
                     if (homes.isEmpty()) {
@@ -326,14 +337,19 @@ public class HomesPlugin extends JavaPlugin {
                         return;
                     }
 
-                    player.sendMessage(LEGACY_AMPERSAND.deserialize("&6=== " + getConfig().getString("gui.title", "Home List") + " ==="));
+                    player.sendMessage(getMessage("home-list-header")
+                            .replace("{title}", getConfig().getString("gui.title", "Home List")));
                     for (String name : homes.keySet()) {
                         Location loc = homes.get(name);
                         if (loc != null && loc.getWorld() != null) {
-                            player.sendMessage(LEGACY_AMPERSAND.deserialize("&e- " + name + "&7 (" +
-                                    loc.getWorld().getName() + ": " + loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ() + ")"));
+                            player.sendMessage(getMessage("home-list-entry")
+                                    .replace("{name}", name)
+                                    .replace("{world}", loc.getWorld().getName())
+                                    .replace("{x}", String.valueOf(loc.getBlockX()))
+                                    .replace("{y}", String.valueOf(loc.getBlockY()))
+                                    .replace("{z}", String.valueOf(loc.getBlockZ())));
                         } else {
-                            player.sendMessage(LEGACY_AMPERSAND.deserialize("&e- " + name));
+                            player.sendMessage(getMessage("home-list-entry-simple").replace("{name}", name));
                         }
                     }
                 }));
@@ -342,7 +358,7 @@ public class HomesPlugin extends JavaPlugin {
 
             // /homes <player> 機能は削除されました。代わりに /vhome <player> を使用してください。
             if (args.length > 0 && !args[0].equalsIgnoreCase("reload")) {
-                 player.sendMessage(LEGACY_AMPERSAND.deserialize("&e他のプレイヤーのホームを見るには &6/vhome <プレイヤー名>&e を使用してください。"));
+                 player.sendMessage(getMessage("vhome-other-info"));
                  return true;
             }
 
@@ -353,7 +369,7 @@ public class HomesPlugin extends JavaPlugin {
         // /vhome <player>
         if (command.getName().equalsIgnoreCase("vhome")) {
             if (args.length == 0) {
-                player.sendMessage(LEGACY_AMPERSAND.deserialize("&c使用法: /vhome <プレイヤー名>"));
+                player.sendMessage(getMessage("usage-vhome"));
                 return true;
             }
 
@@ -376,7 +392,7 @@ public class HomesPlugin extends JavaPlugin {
             if (sender.hasPermission("homes.admin")) {
                 sender.sendMessage(getMessage("admin-view").replace("{player}", name));
             } else {
-                sender.sendMessage(LEGACY_AMPERSAND.deserialize("&a" + name + "の公開ホームを表示します。"));
+                sender.sendMessage(getMessage("vhome-view-public").replace("{player}", name));
             }
 
             homeGUI.open(player, target);

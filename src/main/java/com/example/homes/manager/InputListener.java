@@ -89,9 +89,16 @@ public class InputListener implements Listener {
         return sessionManager.isWaitingForInput(uuid);
     }
 
+    /** 危険な場所への確認テレポート待ちで、入力が confirm かどうか。 */
+    private boolean isUnsafeConfirm(UUID uuid, String message) {
+        return message.equalsIgnoreCase("confirm")
+                && plugin.getTeleportManager() != null
+                && plugin.getTeleportManager().hasPendingConfirm(uuid);
+    }
+
     private void handleChatEvent(Player player, String message, Runnable cancelAction) {
         UUID uuid = player.getUniqueId();
-        if (!isWaiting(uuid)) {
+        if (!isWaiting(uuid) && !isUnsafeConfirm(uuid, message)) {
             return;
         }
 
@@ -140,6 +147,12 @@ public class InputListener implements Listener {
 
     private void handleChat(Player player, String message) {
         UUID uuid = player.getUniqueId();
+
+        // 危険な場所への確認テレポート (チャットに confirm)
+        if (isUnsafeConfirm(uuid, message)) {
+            plugin.getTeleportManager().confirmPending(player);
+            return;
+        }
 
         if (sessionManager.isSearchingHomes(uuid)) {
             sessionManager.setSearchingHomes(uuid, false);

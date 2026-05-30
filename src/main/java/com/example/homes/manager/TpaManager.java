@@ -17,8 +17,6 @@ import com.example.homes.HomesPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 
 public class TpaManager {
 
@@ -99,15 +97,13 @@ public class TpaManager {
         }
         
         // Clickable messages
-        Component accept = Component.text("【承認】", NamedTextColor.GREEN)
-                .decorate(TextDecoration.BOLD)
+        Component accept = plugin.getMessageComponent("tpa-accept-button")
                 .clickEvent(ClickEvent.runCommand("/tpaccept"))
-                .hoverEvent(HoverEvent.showText(Component.text("クリックして承認")));
+                .hoverEvent(HoverEvent.showText(plugin.getMessageComponent("tpa-accept-hover")));
 
-        Component deny = Component.text("【拒否】", NamedTextColor.RED)
-                .decorate(TextDecoration.BOLD)
+        Component deny = plugin.getMessageComponent("tpa-deny-button")
                 .clickEvent(ClickEvent.runCommand("/tpdeny"))
-                .hoverEvent(HoverEvent.showText(Component.text("クリックして拒否")));
+                .hoverEvent(HoverEvent.showText(plugin.getMessageComponent("tpa-deny-hover")));
 
         receiver.sendMessage(accept.append(Component.text("  ")).append(deny));
         receiver.sendMessage(plugin.getMessage("tpa-info")); // Keep old info message as fallback/hint
