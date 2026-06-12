@@ -25,14 +25,14 @@ public class VHomeCommand extends PlayerCommandBase {
     @Override
     protected boolean execute(Player player, String[] args) {
         if (args.length == 0) {
-            player.sendMessage(plugin.getMessage("usage-vhome"));
+            player.sendMessage(plugin.msg("usage-vhome"));
             return true;
         }
 
         String targetName = args[0];
         UUID targetUuid = homeManager.resolveOwnerUuid(targetName);
         if (targetUuid == null) {
-            player.sendMessage(plugin.getMessage("player-not-found"));
+            player.sendMessage(plugin.msg("player-not-found"));
             return true;
         }
         OfflinePlayer target = Bukkit.getOfflinePlayer(targetUuid);
@@ -44,9 +44,9 @@ public class VHomeCommand extends PlayerCommandBase {
 
         String name = target.getName() != null ? target.getName() : targetName;
         if (player.hasPermission("homes.admin")) {
-            player.sendMessage(plugin.getMessage("admin-view").replace("{player}", name));
+            player.sendMessage(plugin.msg("admin-view", "player", name));
         } else {
-            player.sendMessage(plugin.getMessage("vhome-view-public").replace("{player}", name));
+            player.sendMessage(plugin.msg("vhome-view-public", "player", name));
         }
 
         homeGUI.open(player, target);

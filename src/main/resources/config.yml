@@ -77,6 +77,8 @@ sounds:
 
 gui:
   title: "ホーム一覧"
+  # 他プレイヤーのホームを見るとき (/vhome) のタイトル
+  title-other: "{player}のホーム"
   delete-mode-title: "&c削除モード (クリックで削除)"
   public-mode-title: "&b公開設定モード (クリックで切替)"
   rename-mode-title: "&eリネームモード (クリックで名前変更)"

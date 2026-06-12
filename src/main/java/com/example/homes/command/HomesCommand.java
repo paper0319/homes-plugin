@@ -33,7 +33,7 @@ public class HomesCommand implements CommandExecutor {
         // reload はコンソールからも実行できる
         if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("homes.reload") && !sender.isOp()) {
-                sender.sendMessage(plugin.getMessage("no-permission"));
+                sender.sendMessage(plugin.msg("no-permission"));
                 return true;
             }
             plugin.reloadConfig();
@@ -43,39 +43,39 @@ public class HomesCommand implements CommandExecutor {
                 languageManager.load();
             }
             homeManager.reload();
-            sender.sendMessage(plugin.getMessage("reload-success"));
+            sender.sendMessage(plugin.msg("reload-success"));
             return true;
         }
 
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(plugin.getMessage("only-player"));
+            sender.sendMessage(plugin.msg("only-player"));
             return true;
         }
 
         if (args.length > 0 && args[0].equalsIgnoreCase("list")) {
             if (!homeManager.isLoaded(player.getUniqueId())) {
-                player.sendMessage(plugin.getMessage("loading-homes"));
+                player.sendMessage(plugin.msg("loading-homes"));
             }
             homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes ->
                     plugin.getServer().getScheduler().runTask(plugin, () -> {
                         if (homes.isEmpty()) {
-                            player.sendMessage(plugin.getMessage("no-homes"));
+                            player.sendMessage(plugin.msg("no-homes"));
                             return;
                         }
 
-                        player.sendMessage(plugin.getMessage("home-list-header")
-                                .replace("{title}", plugin.getConfig().getString("gui.title", "Home List")));
+                        player.sendMessage(plugin.msg("home-list-header",
+                                "title", plugin.getConfig().getString("gui.title", "Home List")));
                         for (Map.Entry<String, Location> entry : homes.entrySet()) {
                             Location loc = entry.getValue();
                             if (loc != null && loc.getWorld() != null) {
-                                player.sendMessage(plugin.getMessage("home-list-entry")
-                                        .replace("{name}", entry.getKey())
-                                        .replace("{world}", loc.getWorld().getName())
-                                        .replace("{x}", String.valueOf(loc.getBlockX()))
-                                        .replace("{y}", String.valueOf(loc.getBlockY()))
-                                        .replace("{z}", String.valueOf(loc.getBlockZ())));
+                                player.sendMessage(plugin.msg("home-list-entry",
+                                        "name", entry.getKey(),
+                                        "world", loc.getWorld().getName(),
+                                        "x", String.valueOf(loc.getBlockX()),
+                                        "y", String.valueOf(loc.getBlockY()),
+                                        "z", String.valueOf(loc.getBlockZ())));
                             } else {
-                                player.sendMessage(plugin.getMessage("home-list-entry-simple").replace("{name}", entry.getKey()));
+                                player.sendMessage(plugin.msg("home-list-entry-simple", "name", entry.getKey()));
                             }
                         }
                     }));
@@ -84,7 +84,7 @@ public class HomesCommand implements CommandExecutor {
 
         // /homes <player> は廃止済み。/vhome <player> を案内する。
         if (args.length > 0) {
-            player.sendMessage(plugin.getMessage("vhome-other-info"));
+            player.sendMessage(plugin.msg("vhome-other-info"));
             return true;
         }
 

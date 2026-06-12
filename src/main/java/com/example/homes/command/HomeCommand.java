@@ -24,21 +24,21 @@ public class HomeCommand extends PlayerCommandBase {
     @Override
     protected boolean execute(Player player, String[] args) {
         if (args.length == 0) {
-            player.sendMessage(plugin.getMessage("usage-home"));
-            player.sendMessage(plugin.getMessage("use-gui-info"));
+            player.sendMessage(plugin.msg("usage-home"));
+            player.sendMessage(plugin.msg("use-gui-info"));
             return true;
         }
 
         String homeName = String.join(" ", args);
 
         if (!homeManager.isLoaded(player.getUniqueId())) {
-            player.sendMessage(plugin.getMessage("loading-homes"));
+            player.sendMessage(plugin.msg("loading-homes"));
         }
         homeManager.getHomeAsync(player.getUniqueId(), homeName).thenAccept(loc ->
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     if (loc == null) {
-                        player.sendMessage(plugin.getMessage("home-not-found").replace("{name}", homeName));
-                        player.sendMessage(plugin.getMessage("use-gui-info"));
+                        player.sendMessage(plugin.msg("home-not-found", "name", homeName));
+                        player.sendMessage(plugin.msg("use-gui-info"));
                         return;
                     }
                     if (!economyManager.charge(player, "teleport")) {

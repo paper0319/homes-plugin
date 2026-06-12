@@ -57,13 +57,13 @@ public class TeleportManager {
             // Save location right before actual teleport
             saveLocationBeforeTeleport(player);
             if (doTeleport(player, target, allowWater)) {
-                player.sendMessage(plugin.getMessage("teleport-success"));
+                player.sendMessage(plugin.msg("teleport-success"));
                 soundManager.play(player, "teleport-success");
             }
             return;
         }
 
-        player.sendMessage(plugin.getMessage("teleport-start").replace("{seconds}", String.valueOf(delay)));
+        player.sendMessage(plugin.msg("teleport-start", "seconds", String.valueOf(delay)));
 
         Location initialLoc = player.getLocation();
 
@@ -79,7 +79,7 @@ public class TeleportManager {
 
                 // Check movement
                 if (player.getLocation().distance(initialLoc) > 0.1) {
-                    player.sendMessage(plugin.getMessage("teleport-cancelled"));
+                    player.sendMessage(plugin.msg("teleport-cancelled"));
                     soundManager.play(player, "teleport-fail");
                     this.cancel();
                     return;
@@ -89,7 +89,7 @@ public class TeleportManager {
                     // Save location right before actual teleport (not during countdown)
                     saveLocationBeforeTeleport(player);
                     if (doTeleport(player, target, allowWater)) {
-                        player.sendMessage(plugin.getMessage("teleport-success"));
+                        player.sendMessage(plugin.msg("teleport-success"));
                         soundManager.play(player, "teleport-success");
                     }
                     this.cancel();
@@ -126,7 +126,7 @@ public class TeleportManager {
             return false;
         }
         if (target.getWorld() == null) {
-            player.sendMessage(plugin.getMessage("teleport-target-not-found"));
+            player.sendMessage(plugin.msg("teleport-target-not-found"));
             soundManager.play(player, "teleport-fail");
             return false;
         }
@@ -138,7 +138,7 @@ public class TeleportManager {
         exact.setZ(target.getBlockZ() + 0.5);
         player.teleport(exact);
         playTeleportEffect(player);
-        player.sendMessage(plugin.getMessage("teleport-success"));
+        player.sendMessage(plugin.msg("teleport-success"));
         soundManager.play(player, "teleport-success");
         return true;
     }
@@ -157,7 +157,7 @@ public class TeleportManager {
                     playTeleportEffect(player);
                     yield true;
                 }
-                player.sendMessage(plugin.getMessage("teleport-target-not-found"));
+                player.sendMessage(plugin.msg("teleport-target-not-found"));
                 yield false;
             }
             case Location targetLocation -> {
@@ -166,10 +166,10 @@ public class TeleportManager {
                     if (plugin.getConfig().getBoolean("settings.teleport.confirm-unsafe", true)) {
                         // 危険でも確認後にテレポートできるよう、目的地を保留する
                         pendingUnsafe.put(player.getUniqueId(), targetLocation.clone());
-                        player.sendMessage(plugin.getMessage("teleport-unsafe-confirm"));
+                        player.sendMessage(plugin.msg("teleport-unsafe-confirm"));
                         soundManager.play(player, "teleport-fail");
                     } else {
-                        player.sendMessage(plugin.getMessage("teleport-unsafe"));
+                        player.sendMessage(plugin.msg("teleport-unsafe"));
                         soundManager.play(player, "teleport-fail");
                     }
                     yield false;

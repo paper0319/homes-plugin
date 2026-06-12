@@ -62,17 +62,17 @@ public class TpaManager {
             long timeLeft = (lastUse + (cooldownTime * 1000)) - System.currentTimeMillis();
             
             if (timeLeft > 0) {
-                sender.sendMessage(plugin.getMessage("tpa-cooldown").replace("{seconds}", String.valueOf(timeLeft / 1000)));
+                sender.sendMessage(plugin.msg("tpa-cooldown", "seconds", String.valueOf(timeLeft / 1000)));
                 return;
             }
         }
         
         if (tpaDisabled.contains(receiver.getUniqueId())) {
-            sender.sendMessage(plugin.getMessage("tpa-disabled").replace("{player}", receiver.getName()));
+            sender.sendMessage(plugin.msg("tpa-disabled", "player", receiver.getName()));
             return;
         }
         if (isIgnored(receiver.getUniqueId(), sender.getUniqueId())) {
-            sender.sendMessage(plugin.getMessage("tpa-ignored").replace("{player}", receiver.getName()));
+            sender.sendMessage(plugin.msg("tpa-ignored", "player", receiver.getName()));
             return;
         }
 
@@ -81,12 +81,12 @@ public class TpaManager {
         // Update cooldown
         cooldowns.put(sender.getUniqueId(), System.currentTimeMillis());
 
-        sender.sendMessage(plugin.getMessage("tpa-sent").replace("{player}", receiver.getName()));
+        sender.sendMessage(plugin.msg("tpa-sent", "player", receiver.getName()));
         
         if (type == RequestType.TPAHERE) {
-             receiver.sendMessage(plugin.getMessage("tpahere-received").replace("{player}", sender.getName()));
+             receiver.sendMessage(plugin.msg("tpahere-received", "player", sender.getName()));
         } else {
-             receiver.sendMessage(plugin.getMessage("tpa-received").replace("{player}", sender.getName()));
+             receiver.sendMessage(plugin.msg("tpa-received", "player", sender.getName()));
         }
         
         // Clickable messages
@@ -99,7 +99,7 @@ public class TpaManager {
                 .hoverEvent(HoverEvent.showText(plugin.getMessageComponent("tpa-deny-hover")));
 
         receiver.sendMessage(accept.append(Component.text("  ")).append(deny));
-        receiver.sendMessage(plugin.getMessage("tpa-info")); // Keep old info message as fallback/hint
+        receiver.sendMessage(plugin.msg("tpa-info")); // Keep old info message as fallback/hint
         
         // Expire after 60 seconds
         new BukkitRunnable() {
@@ -107,8 +107,8 @@ public class TpaManager {
             public void run() {
                 if (requests.containsKey(receiver.getUniqueId()) && requests.get(receiver.getUniqueId()).containsKey(sender.getUniqueId())) {
                     requests.get(receiver.getUniqueId()).remove(sender.getUniqueId());
-                    if (sender.isOnline()) sender.sendMessage(plugin.getMessage("tpa-expired-sender").replace("{player}", receiver.getName()));
-                    if (receiver.isOnline()) receiver.sendMessage(plugin.getMessage("tpa-expired-receiver").replace("{player}", sender.getName()));
+                    if (sender.isOnline()) sender.sendMessage(plugin.msg("tpa-expired-sender", "player", receiver.getName()));
+                    if (receiver.isOnline()) receiver.sendMessage(plugin.msg("tpa-expired-receiver", "player", sender.getName()));
                 }
             }
         }.runTaskLater(plugin, 20 * 60);
@@ -116,7 +116,7 @@ public class TpaManager {
 
     public void acceptRequest(Player receiver) {
         if (!requests.containsKey(receiver.getUniqueId()) || requests.get(receiver.getUniqueId()).isEmpty()) {
-            receiver.sendMessage(plugin.getMessage("tpa-no-request"));
+            receiver.sendMessage(plugin.msg("tpa-no-request"));
             return;
         }
 
@@ -137,7 +137,7 @@ public class TpaManager {
     
     public void acceptRequest(Player receiver, UUID senderUuid) {
         if (!requests.containsKey(receiver.getUniqueId()) || !requests.get(receiver.getUniqueId()).containsKey(senderUuid)) {
-            receiver.sendMessage(plugin.getMessage("tpa-no-request")); // or specific message
+            receiver.sendMessage(plugin.msg("tpa-no-request")); // or specific message
             return;
         }
 
@@ -145,7 +145,7 @@ public class TpaManager {
         Player sender = Bukkit.getPlayer(senderUuid);
 
         if (sender == null || !sender.isOnline()) {
-            receiver.sendMessage(plugin.getMessage("player-not-found"));
+            receiver.sendMessage(plugin.msg("player-not-found"));
             return;
         }
 
@@ -153,20 +153,20 @@ public class TpaManager {
             // Sender -> Receiver
             // Use TeleportManager for warmup (target is receiver player)
             plugin.getTeleportManager().teleport(sender, receiver);
-            sender.sendMessage(plugin.getMessage("tpa-accepted"));
-            receiver.sendMessage(plugin.getMessage("tpa-accepted-target").replace("{player}", sender.getName()));
+            sender.sendMessage(plugin.msg("tpa-accepted"));
+            receiver.sendMessage(plugin.msg("tpa-accepted-target", "player", sender.getName()));
         } else {
             // Receiver -> Sender (TPAHERE)
             // Use TeleportManager for warmup (target is sender player)
             plugin.getTeleportManager().teleport(receiver, sender);
-            sender.sendMessage(plugin.getMessage("tpa-accepted-target").replace("{player}", receiver.getName()));
-            receiver.sendMessage(plugin.getMessage("tpa-accepted"));
+            sender.sendMessage(plugin.msg("tpa-accepted-target", "player", receiver.getName()));
+            receiver.sendMessage(plugin.msg("tpa-accepted"));
         }
     }
 
     public void denyRequest(Player receiver) {
         if (!requests.containsKey(receiver.getUniqueId()) || requests.get(receiver.getUniqueId()).isEmpty()) {
-            receiver.sendMessage(plugin.getMessage("tpa-no-request"));
+            receiver.sendMessage(plugin.msg("tpa-no-request"));
             return;
         }
         
@@ -174,25 +174,25 @@ public class TpaManager {
         UUID senderUuid = requests.get(receiver.getUniqueId()).keySet().iterator().next();
         requests.get(receiver.getUniqueId()).remove(senderUuid);
         
-        receiver.sendMessage(plugin.getMessage("tpa-request-denied"));
+        receiver.sendMessage(plugin.msg("tpa-request-denied"));
         Player sender = Bukkit.getPlayer(senderUuid);
         if (sender != null) {
-            sender.sendMessage(plugin.getMessage("tpa-denied-sender").replace("{player}", receiver.getName()));
+            sender.sendMessage(plugin.msg("tpa-denied-sender", "player", receiver.getName()));
         }
     }
 
     public void cancelRequest(Player sender, String targetName) {
         Player target = Bukkit.getPlayer(targetName);
         if (target == null) {
-            sender.sendMessage(plugin.getMessage("player-not-found"));
+            sender.sendMessage(plugin.msg("player-not-found"));
             return;
         }
         
         if (requests.containsKey(target.getUniqueId()) && requests.get(target.getUniqueId()).containsKey(sender.getUniqueId())) {
             requests.get(target.getUniqueId()).remove(sender.getUniqueId());
-            sender.sendMessage(plugin.getMessage("tpa-cancelled"));
+            sender.sendMessage(plugin.msg("tpa-cancelled"));
         } else {
-            sender.sendMessage(plugin.getMessage("tpa-no-target-request"));
+            sender.sendMessage(plugin.msg("tpa-no-target-request"));
         }
     }
 
@@ -217,19 +217,19 @@ public class TpaManager {
             // No infinite loop risk because TeleportManager just calls saveLastLocation (put into map), not teleportBack recursively.
             
             plugin.getTeleportManager().teleport(player, loc, true);
-            player.sendMessage(plugin.getMessage("back-success"));
+            player.sendMessage(plugin.msg("back-success"));
         } else {
-            player.sendMessage(plugin.getMessage("back-no-location"));
+            player.sendMessage(plugin.msg("back-no-location"));
         }
     }
 
     public void toggleTpa(Player player) {
         if (tpaDisabled.contains(player.getUniqueId())) {
             tpaDisabled.remove(player.getUniqueId());
-            player.sendMessage(plugin.getMessage("tpa-toggle-on"));
+            player.sendMessage(plugin.msg("tpa-toggle-on"));
         } else {
             tpaDisabled.add(player.getUniqueId());
-            player.sendMessage(plugin.getMessage("tpa-toggle-off"));
+            player.sendMessage(plugin.msg("tpa-toggle-off"));
         }
     }
 
@@ -241,10 +241,10 @@ public class TpaManager {
         ignoredPlayers.computeIfAbsent(player.getUniqueId(), k -> new HashSet<>());
         if (ignoredPlayers.get(player.getUniqueId()).contains(target.getUniqueId())) {
             ignoredPlayers.get(player.getUniqueId()).remove(target.getUniqueId());
-            player.sendMessage(plugin.getMessage("tpa-ignore-remove").replace("{player}", target.getName()));
+            player.sendMessage(plugin.msg("tpa-ignore-remove", "player", target.getName()));
         } else {
             ignoredPlayers.get(player.getUniqueId()).add(target.getUniqueId());
-            player.sendMessage(plugin.getMessage("tpa-ignore-add").replace("{player}", target.getName()));
+            player.sendMessage(plugin.msg("tpa-ignore-add", "player", target.getName()));
         }
     }
     

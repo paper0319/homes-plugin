@@ -91,7 +91,7 @@ public class HomeGUI implements Listener {
 
     public void open(Player viewer, OfflinePlayer target) {
         if (!homeManager.isLoaded(target.getUniqueId())) {
-            viewer.sendMessage(plugin.getMessage("loading-homes"));
+            viewer.sendMessage(plugin.msg("loading-homes"));
             homeManager.ensureLoaded(target.getUniqueId()).thenRun(() -> plugin.getServer().getScheduler().runTask(plugin, () -> open(viewer, target)));
             return;
         }
@@ -119,13 +119,13 @@ public class HomeGUI implements Listener {
         else if (favoriteMode) defaultTitle = "&eお気に入りモード (クリックで切替)";
         else if (memoMode) defaultTitle = "&eメモ編集モード (クリックで編集)";
 
+        String titleText = plugin.getConfig().getString(titleKey, defaultTitle);
         if (!isOwner) {
             String name = target.getName() != null ? target.getName() : "Unknown";
-            defaultTitle = name + "のホーム";
-            titleKey = "gui.title-other";
+            titleText = plugin.getConfig().getString("gui.title-other", "{player}のホーム").replace("{player}", name);
         }
 
-        Component title = colorize(plugin.getConfig().getString(titleKey, defaultTitle));
+        Component title = colorize(titleText);
 
         Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
         List<String> visibleHomes = computeVisibleHomes(viewer, target, homesMap);
@@ -198,8 +198,8 @@ public class HomeGUI implements Listener {
             holder.mapSlot(slot, homeName);
         }
 
-        if (hasPrev) inv.setItem(SLOT_PREV, buildNavButton("&a← 前のページ"));
-        if (hasNext) inv.setItem(SLOT_NEXT, buildNavButton("&a次のページ →"));
+        if (hasPrev) inv.setItem(SLOT_PREV, buildNavButton(lang("gui-prev-page", "&a← 前のページ")));
+        if (hasNext) inv.setItem(SLOT_NEXT, buildNavButton(lang("gui-next-page", "&a次のページ →")));
 
         viewer.openInventory(inv);
     }
@@ -219,12 +219,14 @@ public class HomeGUI implements Listener {
             } else {
                 max = plugin.getConfig().getInt("settings.default-home-limit", 1);
             }
-            lore.add("&e現在の作成数: " + current + " / " + max);
+            lore.add(lang("gui-create-count", "&e現在の作成数: {current} / {max}")
+                    .replace("{current}", String.valueOf(current))
+                    .replace("{max}", String.valueOf(max)));
 
             if (economyManager != null && economyManager.hasEconomy()) {
                 double cost = plugin.getConfig().getDouble("economy.cost.set-home", 0);
                 if (cost > 0) {
-                    lore.add("&6費用: " + economyManager.format(cost));
+                    lore.add(lang("gui-create-cost", "&6費用: {cost}").replace("{cost}", economyManager.format(cost)));
                 }
             }
 
@@ -246,7 +248,7 @@ public class HomeGUI implements Listener {
             }
             String active = sessionManager.getSearchQuery(viewer.getUniqueId());
             if (active != null && !active.isEmpty()) {
-                lore.add("&e検索: " + active);
+                lore.add(lang("gui-search-active", "&e検索: {query}").replace("{query}", active));
             }
             searchMeta.lore(colorizeLore(lore));
             searchItem.setItemMeta(searchMeta);
@@ -320,34 +322,34 @@ public class HomeGUI implements Listener {
         }
 
         boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
-        lore.add(isPublic ? "&a公開中" : "&c非公開");
+        lore.add(isPublic ? lang("gui-status-public", "&a公開中") : lang("gui-status-private", "&c非公開"));
 
         if (isOwner && homeManager.isFavorite(target.getUniqueId(), homeName)) {
-            lore.add("&6★ お気に入り");
+            lore.add(lang("gui-status-favorite", "&6★ お気に入り"));
         }
 
         String memo = homeManager.getMemo(target.getUniqueId(), homeName);
         if (memo != null && !memo.isEmpty()) {
-            lore.add("&7メモ: " + memo);
+            lore.add(lang("gui-status-memo", "&7メモ: {memo}").replace("{memo}", memo));
         }
 
         List<String> actionLore = new ArrayList<>();
         if (deleteMode) {
             actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-delete");
         } else if (publicMode) {
-            actionLore.add("&eクリックして公開/非公開を切り替え");
+            actionLore.add(lang("gui-action-public", "&eクリックして公開/非公開を切り替え"));
         } else if (renameMode) {
-            actionLore.add("&eクリックして名前を変更");
+            actionLore.add(lang("gui-action-rename", "&eクリックして名前を変更"));
         } else if (favoriteMode) {
-            actionLore.add("&eクリックしてお気に入りを切り替え");
+            actionLore.add(lang("gui-action-favorite", "&eクリックしてお気に入りを切り替え"));
         } else if (memoMode) {
-            actionLore.add("&eクリックしてメモを編集");
+            actionLore.add(lang("gui-action-memo", "&eクリックしてメモを編集"));
         } else {
             actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-teleport");
             if (economyManager != null && economyManager.hasEconomy()) {
                 double cost = plugin.getConfig().getDouble("economy.cost.teleport", 0);
                 if (cost > 0) {
-                    lore.add("&6テレポート費用: " + economyManager.format(cost));
+                    lore.add(lang("gui-teleport-cost", "&6テレポート費用: {cost}").replace("{cost}", economyManager.format(cost)));
                 }
             }
         }
@@ -356,6 +358,11 @@ public class HomeGUI implements Listener {
         meta.lore(colorizeLore(lore));
         item.setItemMeta(meta);
         return item;
+    }
+
+    /** 言語ファイルの文字列を未加工 (&カラーコード付き) で返す。lore 組み立て用。 */
+    private String lang(String key, String def) {
+        return plugin.getLanguageManager().getString(key, def);
     }
 
     private Component colorize(String text) {

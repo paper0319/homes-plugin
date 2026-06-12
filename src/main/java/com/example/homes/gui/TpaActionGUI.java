@@ -143,7 +143,7 @@ public class TpaActionGUI implements Listener {
         if (slot == SLOT_TPA || slot == SLOT_TPAHERE) {
             Player target = Bukkit.getPlayer(holder.getTargetUuid());
             if (target == null) {
-                viewer.sendMessage(plugin.getMessage("player-not-found"));
+                viewer.sendMessage(plugin.msg("player-not-found"));
                 tpaGUI.open(viewer);
                 return;
             }

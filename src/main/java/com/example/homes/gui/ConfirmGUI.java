@@ -69,7 +69,9 @@ public class ConfirmGUI implements Listener {
         ItemStack infoItem = new ItemStack(Material.PAPER);
         ItemMeta infoMeta = infoItem.getItemMeta();
         if (infoMeta != null) {
-            infoMeta.displayName(colorize("&e削除対象: &6" + homeName));
+            infoMeta.displayName(colorize(plugin.getLanguageManager()
+                    .getString("gui-delete-target", "&e削除対象: &6{name}")
+                    .replace("{name}", homeName)));
             infoItem.setItemMeta(infoMeta);
         }
         inv.setItem(SLOT_INFO, infoItem);
@@ -103,7 +105,7 @@ public class ConfirmGUI implements Listener {
 
         if (slot == SLOT_YES) {
             homeManager.deleteHome(holder.getTargetUuid(), holder.getHomeName());
-            player.sendMessage(plugin.getMessage("home-deleted").replace("{name}", holder.getHomeName()));
+            player.sendMessage(plugin.msg("home-deleted", "name", holder.getHomeName()));
             soundManager.play(player, "delete-success");
             sessionManager.setDeleteMode(player.getUniqueId(), false);
             homeGUI.open(player, Bukkit.getOfflinePlayer(holder.getTargetUuid()));

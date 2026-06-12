@@ -65,7 +65,7 @@ public class TpaGUI implements Listener {
 
         if (others.isEmpty()) {
             viewer.closeInventory();
-            viewer.sendMessage(plugin.getMessage("tpa-no-online-players"));
+            viewer.sendMessage(plugin.msg("tpa-no-online-players"));
             return;
         }
 
@@ -219,7 +219,7 @@ public class TpaGUI implements Listener {
         UUID targetUuid = holder.getHeads().get(headIndex);
         Player target = Bukkit.getPlayer(targetUuid);
         if (target == null) {
-            viewer.sendMessage(plugin.getMessage("player-not-found"));
+            viewer.sendMessage(plugin.msg("player-not-found"));
             render(viewer, holder.getPage());
             return;
         }

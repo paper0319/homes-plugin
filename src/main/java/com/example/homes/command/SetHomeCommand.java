@@ -21,28 +21,28 @@ public class SetHomeCommand extends PlayerCommandBase {
     @Override
     protected boolean execute(Player player, String[] args) {
         if (args.length == 0) {
-            player.sendMessage(plugin.getMessage("usage-sethome"));
+            player.sendMessage(plugin.msg("usage-sethome"));
             return true;
         }
 
         String homeName = plugin.validateHomeName(String.join(" ", args));
         if (homeName == null) {
-            player.sendMessage(plugin.getMessage("invalid-name"));
+            player.sendMessage(plugin.msg("invalid-name"));
             return true;
         }
         if (!homeManager.isLoaded(player.getUniqueId())) {
-            player.sendMessage(plugin.getMessage("loading-homes"));
+            player.sendMessage(plugin.msg("loading-homes"));
         }
         homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes ->
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     if (homes.containsKey(homeName)) {
-                        player.sendMessage(plugin.getMessage("home-exists"));
+                        player.sendMessage(plugin.msg("home-exists"));
                         return;
                     }
 
                     int max = homeManager.getMaxHomes(player);
                     if (homes.size() >= max) {
-                        player.sendMessage(plugin.getMessage("max-homes-reached").replace("{max}", String.valueOf(max)));
+                        player.sendMessage(plugin.msg("max-homes-reached", "max", String.valueOf(max)));
                         return;
                     }
 
@@ -51,7 +51,7 @@ public class SetHomeCommand extends PlayerCommandBase {
                     }
 
                     homeManager.setHome(player, homeName, player.getLocation());
-                    player.sendMessage(plugin.getMessage("home-set").replace("{name}", homeName));
+                    player.sendMessage(plugin.msg("home-set", "name", homeName));
                 }));
         return true;
     }

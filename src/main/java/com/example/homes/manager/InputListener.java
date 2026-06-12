@@ -1,14 +1,10 @@
 package com.example.homes.manager;
 
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.HomeGUI;
@@ -25,7 +21,6 @@ public class InputListener implements Listener {
     private final SoundManager soundManager;
     private final EconomyManager economyManager;
     private HomeGUI homeGUI;
-    private final Map<UUID, Long> lastChatEventNanos = new ConcurrentHashMap<>();
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
     public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager, EconomyManager economyManager) {
@@ -43,17 +38,17 @@ public class InputListener implements Listener {
     public void startCreation(Player player) {
         if (!homeManager.isLoaded(player.getUniqueId())) {
             homeManager.loadHomes(player.getUniqueId());
-            player.sendMessage("§7ホームを読み込み中...");
+            player.sendMessage(plugin.msg("loading-homes"));
             return;
         }
         if (!homeManager.canSetHome(player)) {
-            player.sendMessage(plugin.getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
+            player.sendMessage(plugin.msg("max-homes-reached", "max", String.valueOf(homeManager.getMaxHomes(player))));
             return;
         }
         
         sessionManager.setCreatingHome(player.getUniqueId(), true);
-        player.sendMessage(plugin.getMessage("enter-name"));
-        player.sendMessage(plugin.getMessage("cancel-info"));
+        player.sendMessage(plugin.msg("enter-name"));
+        player.sendMessage(plugin.msg("cancel-info"));
         player.closeInventory();
         soundManager.play(player, "gui-click"); // Or some start sound
     }
@@ -61,28 +56,28 @@ public class InputListener implements Listener {
     public void startRename(Player player, String oldName) {
         if (!homeManager.isLoaded(player.getUniqueId())) {
             homeManager.loadHomes(player.getUniqueId());
-            player.sendMessage("§7ホームを読み込み中...");
+            player.sendMessage(plugin.msg("loading-homes"));
             return;
         }
         sessionManager.setRenamingTarget(player.getUniqueId(), oldName);
-        player.sendMessage(plugin.getMessage("enter-new-name").replace("{old}", oldName));
-        player.sendMessage(plugin.getMessage("cancel-info"));
+        player.sendMessage(plugin.msg("enter-new-name", "old", oldName));
+        player.sendMessage(plugin.msg("cancel-info"));
         player.closeInventory();
         soundManager.play(player, "gui-click");
     }
 
     public void startSearch(Player player) {
         sessionManager.setSearchingHomes(player.getUniqueId(), true);
-        player.sendMessage(plugin.getMessage("enter-search"));
-        player.sendMessage(plugin.getMessage("cancel-info"));
+        player.sendMessage(plugin.msg("enter-search"));
+        player.sendMessage(plugin.msg("cancel-info"));
         player.closeInventory();
         soundManager.play(player, "gui-click");
     }
 
     public void startEditMemo(Player player, String homeName) {
         sessionManager.setEditingMemoTarget(player.getUniqueId(), homeName);
-        player.sendMessage(plugin.getMessage("enter-memo").replace("{name}", homeName));
-        player.sendMessage(plugin.getMessage("cancel-info"));
+        player.sendMessage(plugin.msg("enter-memo", "name", homeName));
+        player.sendMessage(plugin.msg("cancel-info"));
         player.closeInventory();
         soundManager.play(player, "gui-click");
     }
@@ -98,53 +93,21 @@ public class InputListener implements Listener {
                 && plugin.getTeleportManager().hasPendingConfirm(uuid);
     }
 
-    private void handleChatEvent(Player player, String message, Runnable cancelAction) {
+    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+    public void onChat(AsyncChatEvent event) {
+        Player player = event.getPlayer();
+        String message = PLAIN_TEXT.serialize(event.originalMessage()).trim();
         UUID uuid = player.getUniqueId();
         if (!isWaiting(uuid) && !isUnsafeConfirm(uuid, message)) {
             return;
         }
 
-        long now = System.nanoTime();
-        long threshold = 50_000_000L;
-        AtomicBoolean accepted = new AtomicBoolean(false);
-        lastChatEventNanos.compute(uuid, (k, v) -> {
-            if (v == null || now - v >= threshold) {
-                accepted.set(true);
-                return now;
-            }
-            return v;
-        });
+        event.setCancelled(true);
+        event.viewers().clear();
+        event.message(Component.empty());
 
-        cancelAction.run();
-
-        if (!accepted.get()) {
-            return;
-        }
-
+        // チャットイベントは非同期で発火するため、メインスレッドで処理する
         plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
-    }
-
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
-    @SuppressWarnings("deprecation")
-    public void onChatLegacy(AsyncPlayerChatEvent event) {
-        Player player = event.getPlayer();
-        String message = event.getMessage().trim();
-        handleChatEvent(player, message, () -> {
-            event.setCancelled(true);
-            event.getRecipients().clear();
-            event.setMessage("");
-        });
-    }
-
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
-    public void onChat(AsyncChatEvent event) {
-        Player player = event.getPlayer();
-        String message = PLAIN_TEXT.serialize(event.originalMessage()).trim();
-        handleChatEvent(player, message, () -> {
-            event.setCancelled(true);
-            event.viewers().clear();
-            event.message(Component.empty());
-        });
     }
 
     private void handleChat(Player player, String message) {
@@ -160,7 +123,7 @@ public class InputListener implements Listener {
             sessionManager.setSearchingHomes(uuid, false);
 
             if (message.equalsIgnoreCase("cancel")) {
-                player.sendMessage(plugin.getMessage("search-cancelled"));
+                player.sendMessage(plugin.msg("search-cancelled"));
                 soundManager.play(player, "gui-click");
                 if (homeGUI != null) {
                     homeGUI.open(player);
@@ -186,7 +149,7 @@ public class InputListener implements Listener {
             if (message.equalsIgnoreCase("cancel")) {
                 sessionManager.setEditingMemoTarget(uuid, null);
                 sessionManager.setMemoMode(uuid, false);
-                player.sendMessage(plugin.getMessage("memo-cancelled"));
+                player.sendMessage(plugin.msg("memo-cancelled"));
                 soundManager.play(player, "gui-click");
                 if (homeGUI != null) {
                     homeGUI.open(player);
@@ -204,12 +167,12 @@ public class InputListener implements Listener {
 
             int maxLen = plugin.getMaxHomeMemoLength();
             if (maxLen > 0 && memo.length() > maxLen) {
-                player.sendMessage(plugin.getMessage("memo-too-long").replace("{max}", String.valueOf(maxLen)));
+                player.sendMessage(plugin.msg("memo-too-long", "max", String.valueOf(maxLen)));
                 soundManager.play(player, "teleport-fail");
                 return;
             }
             if (memo.contains("\u00A7")) {
-                player.sendMessage(plugin.getMessage("invalid-name"));
+                player.sendMessage(plugin.msg("invalid-name"));
                 soundManager.play(player, "teleport-fail");
                 return;
             }
@@ -217,9 +180,9 @@ public class InputListener implements Listener {
             String finalMemo = memo.isEmpty() ? null : memo;
             homeManager.setMemo(uuid, homeName, finalMemo);
             if (finalMemo == null) {
-                player.sendMessage(plugin.getMessage("memo-cleared").replace("{name}", homeName));
+                player.sendMessage(plugin.msg("memo-cleared", "name", homeName));
             } else {
-                player.sendMessage(plugin.getMessage("memo-updated").replace("{name}", homeName));
+                player.sendMessage(plugin.msg("memo-updated", "name", homeName));
             }
             soundManager.play(player, "teleport-success");
             if (homeGUI != null) {
@@ -233,7 +196,7 @@ public class InputListener implements Listener {
             if (message.equalsIgnoreCase("cancel")) {
                 sessionManager.setRenamingTarget(uuid, null);
                 sessionManager.setRenameMode(uuid, false);
-                player.sendMessage(plugin.getMessage("rename-cancelled"));
+                player.sendMessage(plugin.msg("rename-cancelled"));
                 soundManager.play(player, "gui-click");
                 if (homeGUI != null) {
                     homeGUI.open(player);
@@ -243,13 +206,13 @@ public class InputListener implements Listener {
 
             String newName = plugin.validateHomeName(message);
             if (newName == null) {
-                player.sendMessage(plugin.getMessage("invalid-name"));
+                player.sendMessage(plugin.msg("invalid-name"));
                 soundManager.play(player, "teleport-fail");
                 return;
             }
 
             if (homeManager.hasHome(player, newName)) {
-                player.sendMessage(plugin.getMessage("home-exists"));
+                player.sendMessage(plugin.msg("home-exists"));
                 soundManager.play(player, "teleport-fail");
                 return;
             }
@@ -259,7 +222,7 @@ public class InputListener implements Listener {
             sessionManager.setRenameMode(uuid, false);
 
             homeManager.renameHome(uuid, oldName, newName);
-            player.sendMessage(plugin.getMessage("home-renamed").replace("{old}", oldName).replace("{new}", newName));
+            player.sendMessage(plugin.msg("home-renamed", "old", oldName, "new", newName));
             soundManager.play(player, "teleport-success");
             if (homeGUI != null) {
                 homeGUI.open(player);
@@ -273,26 +236,26 @@ public class InputListener implements Listener {
 
         if (message.equalsIgnoreCase("cancel")) {
             sessionManager.setCreatingHome(uuid, false);
-            player.sendMessage(plugin.getMessage("creation-cancelled"));
+            player.sendMessage(plugin.msg("creation-cancelled"));
             soundManager.play(player, "gui-click");
             return;
         }
 
         String homeName = plugin.validateHomeName(message);
         if (homeName == null) {
-            player.sendMessage(plugin.getMessage("invalid-name"));
+            player.sendMessage(plugin.msg("invalid-name"));
             soundManager.play(player, "teleport-fail");
             return;
         }
 
         if (homeManager.hasHome(player, homeName)) {
-            player.sendMessage(plugin.getMessage("home-exists"));
+            player.sendMessage(plugin.msg("home-exists"));
             soundManager.play(player, "teleport-fail");
             return;
         }
 
         if (!homeManager.canSetHome(player)) {
-            player.sendMessage(plugin.getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
+            player.sendMessage(plugin.msg("max-homes-reached", "max", String.valueOf(homeManager.getMaxHomes(player))));
             sessionManager.setCreatingHome(uuid, false);
             return;
         }
@@ -304,7 +267,7 @@ public class InputListener implements Listener {
         }
 
         homeManager.setHome(player, homeName, player.getLocation());
-        player.sendMessage(plugin.getMessage("home-created").replace("{name}", homeName));
+        player.sendMessage(plugin.msg("home-created", "name", homeName));
         soundManager.play(player, "teleport-success");
         sessionManager.setCreatingHome(uuid, false);
         if (homeGUI != null) {

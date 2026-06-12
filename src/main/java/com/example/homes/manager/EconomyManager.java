@@ -64,11 +64,11 @@ public class EconomyManager {
         double cost = plugin.getConfig().getDouble("economy.cost." + costKey, 0);
         if (cost <= 0) return true;
         if (!hasMoney(player, cost)) {
-            player.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", format(cost)));
+            player.sendMessage(plugin.msg("insufficient-funds", "cost", format(cost)));
             return false;
         }
         withdraw(player, cost);
-        player.sendMessage(plugin.getMessage("payment-success").replace("{cost}", format(cost)));
+        player.sendMessage(plugin.msg("payment-success", "cost", format(cost)));
         return true;
     }
 }

@@ -39,11 +39,11 @@ public class TpaRequestCommand extends PlayerCommandBase {
         }
         Player target = Bukkit.getPlayer(args[0]);
         if (target == null) {
-            player.sendMessage(plugin.getMessage("player-not-found"));
+            player.sendMessage(plugin.msg("player-not-found"));
             return true;
         }
         if (target.getUniqueId().equals(player.getUniqueId())) {
-            player.sendMessage(plugin.getMessage("tpa-self"));
+            player.sendMessage(plugin.msg("tpa-self"));
             return true;
         }
         tpaManager.sendRequest(player, target, type);

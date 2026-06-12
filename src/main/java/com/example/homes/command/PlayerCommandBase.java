@@ -32,12 +32,12 @@ public abstract class PlayerCommandBase implements CommandExecutor {
     @Override
     public final boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(plugin.getMessage("only-player"));
+            sender.sendMessage(plugin.msg("only-player"));
             return true;
         }
         String toggleKey = featureToggleKey();
         if (toggleKey != null && !plugin.getConfig().getBoolean(toggleKey, true)) {
-            player.sendMessage(plugin.getMessage(featureDisabledMessageKey()));
+            player.sendMessage(plugin.msg(featureDisabledMessageKey()));
             return true;
         }
         return execute(player, args);

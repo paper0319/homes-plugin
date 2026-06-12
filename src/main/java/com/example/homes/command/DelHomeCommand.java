@@ -21,23 +21,23 @@ public class DelHomeCommand extends PlayerCommandBase {
     @Override
     protected boolean execute(Player player, String[] args) {
         if (args.length == 0) {
-            player.sendMessage(plugin.getMessage("usage-delhome"));
+            player.sendMessage(plugin.msg("usage-delhome"));
             return true;
         }
 
         String homeName = String.join(" ", args);
         if (!homeManager.isLoaded(player.getUniqueId())) {
-            player.sendMessage(plugin.getMessage("loading-homes"));
+            player.sendMessage(plugin.msg("loading-homes"));
         }
         homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes ->
                 plugin.getServer().getScheduler().runTask(plugin, () -> {
                     if (!homes.containsKey(homeName)) {
-                        player.sendMessage(plugin.getMessage("home-not-found").replace("{name}", homeName));
+                        player.sendMessage(plugin.msg("home-not-found", "name", homeName));
                         return;
                     }
 
                     homeManager.deleteHome(player, homeName);
-                    player.sendMessage(plugin.getMessage("home-deleted").replace("{name}", homeName));
+                    player.sendMessage(plugin.msg("home-deleted", "name", homeName));
                     soundManager.play(player, "delete-success");
                 }));
         return true;

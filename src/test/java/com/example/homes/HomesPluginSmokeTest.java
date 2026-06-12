@@ -44,9 +44,17 @@ class HomesPluginSmokeTest {
 
     @Test
     void messagesResolveFromBundledLanguageFile() {
-        String msg = plugin.getMessage("no-permission");
+        String msg = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(plugin.msg("no-permission"));
         assertNotNull(msg);
         assertTrue(!msg.contains("Message not found"), "lang key missing: no-permission");
+    }
+
+    @Test
+    void msgReplacesPlaceholdersLiterally() {
+        String msg = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                .serialize(plugin.msg("home-set", "name", "base&c"));
+        assertTrue(msg.contains("base&c"), "placeholder value should be inserted literally: " + msg);
     }
 
     @Test

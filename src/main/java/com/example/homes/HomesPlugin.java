@@ -39,7 +39,6 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 public class HomesPlugin extends JavaPlugin {
 
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
-    private static final LegacyComponentSerializer LEGACY_SECTION = LegacyComponentSerializer.legacySection();
 
     private HomeManager homeManager;
     private SessionManager sessionManager;
@@ -178,14 +177,26 @@ public class HomesPlugin extends JavaPlugin {
         getLogger().info("HomesPlugin が無効になりました！");
     }
 
-    public String getMessage(String key) {
-        return LEGACY_SECTION.serialize(getMessageComponent(key));
-    }
-
     public Component getMessageComponent(String key) {
         String msg = languageManager != null ? languageManager.getString(key) : null;
         if (msg == null) return Component.text("Message not found: " + key);
         return LEGACY_AMPERSAND.deserialize(msg);
+    }
+
+    /**
+     * 言語ファイルのメッセージを Component で返す。
+     * 引数は "プレースホルダー名, 値" のペアで渡し、値はカラーコード解釈されずそのまま挿入される。
+     * 例: msg("home-set", "name", homeName)
+     */
+    public Component msg(String key, String... placeholderPairs) {
+        Component component = getMessageComponent(key);
+        for (int i = 0; i + 1 < placeholderPairs.length; i += 2) {
+            String placeholder = "{" + placeholderPairs[i] + "}";
+            String value = placeholderPairs[i + 1];
+            component = component.replaceText(builder ->
+                    builder.matchLiteral(placeholder).replacement(value));
+        }
+        return component;
     }
 
     /**
