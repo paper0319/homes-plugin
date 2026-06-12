@@ -12,6 +12,7 @@ import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.example.homes.gui.ConfirmGUI;
 import com.example.homes.gui.HomeGUI;
 import com.example.homes.gui.TpaActionGUI;
 import com.example.homes.gui.TpaGUI;
@@ -41,6 +42,7 @@ public class HomesPlugin extends JavaPlugin {
     private SessionManager sessionManager;
     private TeleportManager teleportManager;
     private HomeGUI homeGUI;
+    private ConfirmGUI confirmGUI;
     private TpaGUI tpaGUI;
     private TpaActionGUI tpaActionGUI;
     private InputListener inputListener;
@@ -93,6 +95,8 @@ public class HomesPlugin extends JavaPlugin {
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager); // Pass tpaManager
         this.inputListener = new InputListener(this, homeManager, sessionManager, soundManager);
         this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);
+        this.confirmGUI = new ConfirmGUI(this, homeManager, homeGUI, soundManager, sessionManager);
+        this.homeGUI.setConfirmGUI(confirmGUI);
         this.tpaGUI = new TpaGUI(this);
         this.tpaActionGUI = new TpaActionGUI(this, tpaGUI);
         this.tpaGUI.setTpaActionGUI(tpaActionGUI);
@@ -105,6 +109,7 @@ public class HomesPlugin extends JavaPlugin {
         this.inputListener.setHomeGUI(homeGUI);
 
         getServer().getPluginManager().registerEvents(homeGUI, this);
+        getServer().getPluginManager().registerEvents(confirmGUI, this);
         getServer().getPluginManager().registerEvents(inputListener, this);
         getServer().getPluginManager().registerEvents(dataListener, this);
         getServer().getPluginManager().registerEvents(deathListener, this);

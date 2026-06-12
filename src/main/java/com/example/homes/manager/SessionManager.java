@@ -2,7 +2,6 @@ package com.example.homes.manager;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -17,9 +16,7 @@ public class SessionManager {
     
     // --- Search & Pagination States ---
     private final Map<UUID, String> searchQuery = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> currentStartIndex = new ConcurrentHashMap<>();
-    private final Map<UUID, Stack<Integer>> pageHistory = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> lastPageSize = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> page = new ConcurrentHashMap<>();
     
     // --- Input Waiting States ---
     private final Set<UUID> creatingHome = ConcurrentHashMap.newKeySet();
@@ -34,10 +31,8 @@ public class SessionManager {
         favoriteModePlayers.remove(uuid);
         memoModePlayers.remove(uuid);
         searchQuery.remove(uuid);
-        currentStartIndex.remove(uuid);
-        pageHistory.remove(uuid);
-        lastPageSize.remove(uuid);
-        
+        page.remove(uuid);
+
         creatingHome.remove(uuid);
         searchingHomes.remove(uuid);
         renamingHomeTarget.remove(uuid);
@@ -71,13 +66,11 @@ public class SessionManager {
     }
 
     // Pagination
-    public int getCurrentStartIndex(UUID uuid) { return currentStartIndex.getOrDefault(uuid, 0); }
-    public void setCurrentStartIndex(UUID uuid, int index) { currentStartIndex.put(uuid, index); }
-    
-    public Stack<Integer> getPageHistory(UUID uuid) { return pageHistory.computeIfAbsent(uuid, k -> new Stack<>()); }
-    
-    public int getLastPageSize(UUID uuid) { return lastPageSize.getOrDefault(uuid, 0); }
-    public void setLastPageSize(UUID uuid, int size) { lastPageSize.put(uuid, size); }
+    public int getPage(UUID uuid) { return page.getOrDefault(uuid, 0); }
+    public void setPage(UUID uuid, int value) {
+        if (value <= 0) page.remove(uuid);
+        else page.put(uuid, value);
+    }
 
     // Input States
     public boolean isCreatingHome(UUID uuid) { return creatingHome.contains(uuid); }

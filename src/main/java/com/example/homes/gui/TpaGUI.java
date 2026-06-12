@@ -2,9 +2,7 @@ package com.example.homes.gui;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
@@ -14,17 +12,16 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 import com.example.homes.HomesPlugin;
+import com.example.homes.gui.holder.TpaGuiHolder;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class TpaGUI implements Listener {
 
@@ -41,13 +38,9 @@ public class TpaGUI implements Listener {
     private static final int SLOT_NEXT = 53;
 
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
-    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     private final HomesPlugin plugin;
     private TpaActionGUI tpaActionGUI;
-
-    private final Map<UUID, Integer> currentPage = new HashMap<>();
-    private final Map<UUID, List<UUID>> pageSnapshot = new HashMap<>();
 
     public TpaGUI(HomesPlugin plugin) {
         this.plugin = plugin;
@@ -58,11 +51,10 @@ public class TpaGUI implements Listener {
     }
 
     public void open(Player viewer) {
-        currentPage.put(viewer.getUniqueId(), 0);
-        render(viewer);
+        render(viewer, 0);
     }
 
-    private void render(Player viewer) {
+    private void render(Player viewer, int page) {
         List<Player> others = new ArrayList<>();
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (!p.getUniqueId().equals(viewer.getUniqueId())) {
@@ -74,16 +66,12 @@ public class TpaGUI implements Listener {
         if (others.isEmpty()) {
             viewer.closeInventory();
             viewer.sendMessage(plugin.getMessage("tpa-no-online-players"));
-            currentPage.remove(viewer.getUniqueId());
-            pageSnapshot.remove(viewer.getUniqueId());
             return;
         }
 
         int totalPages = (others.size() + HEADS_PER_PAGE - 1) / HEADS_PER_PAGE;
-        int page = currentPage.getOrDefault(viewer.getUniqueId(), 0);
         if (page >= totalPages) page = totalPages - 1;
         if (page < 0) page = 0;
-        currentPage.put(viewer.getUniqueId(), page);
 
         String titleBase = plugin.getConfig().getString("gui.tpa.title", "&aTPAリクエスト一覧");
         String titleSuffix = plugin.getConfig().getString("gui.tpa.title-page-suffix", " [{page}/{total}]")
@@ -91,23 +79,25 @@ public class TpaGUI implements Listener {
                 .replace("{total}", String.valueOf(totalPages));
         Component title = colorize(titleBase + titleSuffix);
 
-        Inventory inv = Bukkit.createInventory(null, GUI_SIZE, title);
+        int startIdx = page * HEADS_PER_PAGE;
+        int endIdx = Math.min(startIdx + HEADS_PER_PAGE, others.size());
+        List<UUID> heads = new ArrayList<>(endIdx - startIdx);
+        for (int i = startIdx; i < endIdx; i++) {
+            heads.add(others.get(i).getUniqueId());
+        }
+
+        TpaGuiHolder holder = new TpaGuiHolder(page, heads);
+        Inventory inv = Bukkit.createInventory(holder, GUI_SIZE, title);
+        holder.setInventory(inv);
 
         ItemStack border = createBorder();
         for (int i = 0; i < GUI_SIZE; i++) {
             inv.setItem(i, border);
         }
 
-        int startIdx = page * HEADS_PER_PAGE;
-        int endIdx = Math.min(startIdx + HEADS_PER_PAGE, others.size());
-        List<UUID> snapshot = new ArrayList<>(HEADS_PER_PAGE);
         for (int i = startIdx; i < endIdx; i++) {
-            Player p = others.get(i);
-            int slot = HEAD_SLOTS[i - startIdx];
-            inv.setItem(slot, createHead(p));
-            snapshot.add(p.getUniqueId());
+            inv.setItem(HEAD_SLOTS[i - startIdx], createHead(others.get(i)));
         }
-        pageSnapshot.put(viewer.getUniqueId(), snapshot);
 
         inv.setItem(SLOT_REFRESH, createRefreshButton());
 
@@ -190,11 +180,12 @@ public class TpaGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        if (!isThisGui(event.getView().title())) return;
+        Inventory top = event.getView().getTopInventory();
+        if (!(top.getHolder() instanceof TpaGuiHolder holder)) return;
 
         event.setCancelled(true);
 
-        if (event.getClickedInventory() != event.getView().getTopInventory()) return;
+        if (event.getClickedInventory() != top) return;
 
         Player viewer = (Player) event.getWhoClicked();
         int slot = event.getSlot();
@@ -202,22 +193,17 @@ public class TpaGUI implements Listener {
         if (clicked == null || clicked.getType() == Material.AIR) return;
 
         if (slot == SLOT_REFRESH) {
-            currentPage.put(viewer.getUniqueId(), 0);
-            render(viewer);
+            render(viewer, 0);
             return;
         }
         if (slot == SLOT_PREV) {
-            int page = currentPage.getOrDefault(viewer.getUniqueId(), 0);
-            if (page > 0) {
-                currentPage.put(viewer.getUniqueId(), page - 1);
-                render(viewer);
+            if (holder.getPage() > 0) {
+                render(viewer, holder.getPage() - 1);
             }
             return;
         }
         if (slot == SLOT_NEXT) {
-            int page = currentPage.getOrDefault(viewer.getUniqueId(), 0);
-            currentPage.put(viewer.getUniqueId(), page + 1);
-            render(viewer);
+            render(viewer, holder.getPage() + 1);
             return;
         }
 
@@ -228,16 +214,13 @@ public class TpaGUI implements Listener {
                 break;
             }
         }
-        if (headIndex < 0) return;
+        if (headIndex < 0 || headIndex >= holder.getHeads().size()) return;
 
-        List<UUID> snapshot = pageSnapshot.get(viewer.getUniqueId());
-        if (snapshot == null || headIndex >= snapshot.size()) return;
-
-        UUID targetUuid = snapshot.get(headIndex);
+        UUID targetUuid = holder.getHeads().get(headIndex);
         Player target = Bukkit.getPlayer(targetUuid);
         if (target == null) {
             viewer.sendMessage(plugin.getMessage("player-not-found"));
-            render(viewer);
+            render(viewer, holder.getPage());
             return;
         }
 
@@ -248,31 +231,13 @@ public class TpaGUI implements Listener {
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (isThisGui(event.getView().title())) {
+        if (event.getView().getTopInventory().getHolder() instanceof TpaGuiHolder) {
             event.setCancelled(true);
         }
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
-        currentPage.remove(uuid);
-        pageSnapshot.remove(uuid);
-    }
-
-    private boolean isThisGui(Component viewTitle) {
-        String titleBase = plain(colorize(plugin.getConfig().getString("gui.tpa.title", "&aTPAリクエスト一覧")));
-        String actual = plain(viewTitle);
-        return actual.startsWith(titleBase);
     }
 
     private Component colorize(String text) {
         if (text == null) return Component.empty();
         return LEGACY_AMPERSAND.deserialize(text);
-    }
-
-    private String plain(Component c) {
-        if (c == null) return "";
-        return PLAIN.serialize(c);
     }
 }

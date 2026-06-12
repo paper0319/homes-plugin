@@ -70,11 +70,19 @@ class SessionManagerTest {
     }
 
     @Test
+    void pageDefaultsToZeroAndClampsNegative() {
+        assertEquals(0, sessionManager.getPage(uuid));
+        sessionManager.setPage(uuid, 3);
+        assertEquals(3, sessionManager.getPage(uuid));
+        sessionManager.setPage(uuid, -1);
+        assertEquals(0, sessionManager.getPage(uuid));
+    }
+
+    @Test
     void cleanupClearsEverything() {
         sessionManager.setDeleteMode(uuid, true);
         sessionManager.setSearchQuery(uuid, "base");
-        sessionManager.setCurrentStartIndex(uuid, 9);
-        sessionManager.getPageHistory(uuid).push(0);
+        sessionManager.setPage(uuid, 2);
         sessionManager.setCreatingHome(uuid, true);
         sessionManager.setRenamingTarget(uuid, "base");
 
@@ -82,8 +90,7 @@ class SessionManagerTest {
 
         assertFalse(sessionManager.isDeleteMode(uuid));
         assertNull(sessionManager.getSearchQuery(uuid));
-        assertEquals(0, sessionManager.getCurrentStartIndex(uuid));
-        assertTrue(sessionManager.getPageHistory(uuid).isEmpty());
+        assertEquals(0, sessionManager.getPage(uuid));
         assertFalse(sessionManager.isWaitingForInput(uuid));
     }
 }

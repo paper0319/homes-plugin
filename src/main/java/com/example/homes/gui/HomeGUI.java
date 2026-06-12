@@ -1,7 +1,6 @@
 package com.example.homes.gui;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +23,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import com.example.homes.HomesPlugin;
+import com.example.homes.gui.holder.HomeGuiHolder;
 import com.example.homes.manager.EconomyManager;
 import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.InputListener;
@@ -33,21 +33,35 @@ import com.example.homes.manager.TeleportManager;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class HomeGUI implements Listener {
+
+    private static final int GUI_SIZE_SMALL = 27;
+    private static final int GUI_SIZE_LARGE = 54;
+    /** 小 GUI でホームに使えるスロット数 (9..26)。 */
+    private static final int SMALL_CAPACITY = 18;
+    /** 大 GUI でホームに使えるスロット数 (9..53 からナビ2枠を除く)。 */
+    private static final int LARGE_CAPACITY = 43;
+    private static final int SLOT_CREATE = 0;
+    private static final int SLOT_RENAME = 1;
+    private static final int SLOT_SEARCH = 2;
+    private static final int SLOT_FAVORITE = 3;
+    private static final int SLOT_MEMO = 4;
+    private static final int SLOT_PUBLIC = 7;
+    private static final int SLOT_DELETE = 8;
+    private static final int SLOT_PREV = 45;
+    private static final int SLOT_NEXT = 53;
+
+    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
 
     private final HomesPlugin plugin;
     private final HomeManager homeManager;
     private final TeleportManager teleportManager;
     private final SoundManager soundManager;
     private final EconomyManager economyManager;
-    private InputListener inputListener;
     private final SessionManager sessionManager;
-    private static final int GUI_SIZE_SMALL = 27;
-    private static final int GUI_SIZE_LARGE = 54;
-    private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
-    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
+    private InputListener inputListener;
+    private ConfirmGUI confirmGUI;
 
     public HomeGUI(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, TeleportManager teleportManager, SoundManager soundManager, EconomyManager economyManager) {
         this.plugin = plugin;
@@ -62,14 +76,19 @@ public class HomeGUI implements Listener {
         this.inputListener = inputListener;
     }
 
+    public void setConfirmGUI(ConfirmGUI confirmGUI) {
+        this.confirmGUI = confirmGUI;
+    }
+
     public void setSearchQuery(UUID viewer, String query) {
         sessionManager.setSearchQuery(viewer, query);
+        sessionManager.setPage(viewer, 0);
     }
 
     public void open(Player player) {
         open(player, player);
     }
-    
+
     public void open(Player viewer, OfflinePlayer target) {
         if (!homeManager.isLoaded(target.getUniqueId())) {
             viewer.sendMessage(plugin.getMessage("loading-homes"));
@@ -79,109 +98,151 @@ public class HomeGUI implements Listener {
 
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());
         boolean isAdmin = viewer.hasPermission("homes.admin") && !isOwner;
-        
+
         boolean deleteMode = sessionManager.isDeleteMode(viewer.getUniqueId());
         boolean publicMode = sessionManager.isPublicMode(viewer.getUniqueId());
         boolean renameMode = sessionManager.isRenameMode(viewer.getUniqueId());
         boolean favoriteMode = sessionManager.isFavoriteMode(viewer.getUniqueId());
         boolean memoMode = sessionManager.isMemoMode(viewer.getUniqueId());
-        
+
         String titleKey = "gui.title";
         if (deleteMode) titleKey = "gui.delete-mode-title";
         else if (publicMode) titleKey = "gui.public-mode-title";
         else if (renameMode) titleKey = "gui.rename-mode-title";
         else if (favoriteMode) titleKey = "gui.favorite-mode-title";
         else if (memoMode) titleKey = "gui.memo-mode-title";
-        
+
         String defaultTitle = "ホーム一覧";
         if (deleteMode) defaultTitle = "&c削除モード (クリックで削除)";
         else if (publicMode) defaultTitle = "&b公開設定モード (クリックで切替)";
         else if (renameMode) defaultTitle = "&eリネームモード (クリックで名前変更)";
         else if (favoriteMode) defaultTitle = "&eお気に入りモード (クリックで切替)";
         else if (memoMode) defaultTitle = "&eメモ編集モード (クリックで編集)";
-        
+
         if (!isOwner) {
             String name = target.getName() != null ? target.getName() : "Unknown";
             defaultTitle = name + "のホーム";
-            titleKey = "gui.title-other"; // Custom key if wanted, fallback to defaultTitle
+            titleKey = "gui.title-other";
         }
-        
+
         Component title = colorize(plugin.getConfig().getString(titleKey, defaultTitle));
-        
-        // Load and Sort Homes
+
         Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
-        List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
-        String query = sessionManager.getSearchQuery(viewer.getUniqueId());
-        if (query != null && !query.isEmpty()) {
-            String qLower = query.toLowerCase();
-            visibleHomes.removeIf(n -> !n.toLowerCase().contains(qLower));
-        }
+        List<String> visibleHomes = computeVisibleHomes(viewer, target, homesMap);
 
-        Collections.sort(visibleHomes); // Sort by name for consistent order
+        boolean large = visibleHomes.size() > SMALL_CAPACITY;
+        int guiSize = large ? GUI_SIZE_LARGE : GUI_SIZE_SMALL;
+        int capacity = large ? LARGE_CAPACITY : SMALL_CAPACITY;
+        int totalPages = Math.max(1, (visibleHomes.size() + capacity - 1) / capacity);
+
+        int page = sessionManager.getPage(viewer.getUniqueId());
+        if (page >= totalPages) {
+            page = 0;
+            sessionManager.setPage(viewer.getUniqueId(), 0);
+        }
+        boolean hasPrev = page > 0;
+        boolean hasNext = page < totalPages - 1;
+
+        HomeGuiHolder holder = new HomeGuiHolder(target.getUniqueId(), hasPrev, hasNext);
+        Inventory inv = Bukkit.createInventory(holder, guiSize, title);
+        holder.setInventory(inv);
+
         if (isOwner) {
-            visibleHomes.sort((a, b) -> {
-                boolean af = homeManager.isFavorite(target.getUniqueId(), a);
-                boolean bf = homeManager.isFavorite(target.getUniqueId(), b);
-                if (af != bf) return af ? -1 : 1;
-                return a.compareToIgnoreCase(b);
-            });
+            inv.setItem(SLOT_CREATE, buildCreateButton(target));
+            inv.setItem(SLOT_RENAME, buildToggleButton(renameMode,
+                    renameMode ? Material.NAME_TAG : Material.NAME_TAG,
+                    "gui.rename-button", "&eリネームモード: ON", "&aリネームモード: OFF",
+                    "&7クリックしてモードを終了", "&7クリックしてリネームモードに切替"));
+            inv.setItem(SLOT_FAVORITE, buildToggleButton(favoriteMode,
+                    favoriteMode ? Material.NETHER_STAR : Material.FIREWORK_STAR,
+                    "gui.favorite-button", "&eお気に入りモード: ON", "&aお気に入りモード: OFF",
+                    "&7クリックしてOFFにする", "&7クリックしてONにする"));
+            inv.setItem(SLOT_MEMO, buildToggleButton(memoMode,
+                    memoMode ? Material.WRITABLE_BOOK : Material.BOOK,
+                    "gui.memo-button", "&eメモ編集モード: ON", "&aメモ編集モード: OFF",
+                    "&7クリックしてOFFにする", "&7クリックしてONにする"));
+            inv.setItem(SLOT_PUBLIC, buildToggleButton(publicMode,
+                    publicMode ? Material.ENDER_EYE : Material.ENDER_PEARL,
+                    "gui.public-button", "&b公開設定モード: ON", "&a公開設定モード: OFF",
+                    "&7クリックしてモードを終了", "&7クリックして公開設定モードに切替"));
         }
 
-        // Determine GUI Size
-        int guiSize = GUI_SIZE_SMALL;
-        if (visibleHomes.size() > 18) {
-            guiSize = GUI_SIZE_LARGE;
+        inv.setItem(SLOT_SEARCH, buildSearchButton(viewer));
+
+        if (isOwner || isAdmin) {
+            inv.setItem(SLOT_DELETE, buildToggleButton(deleteMode,
+                    deleteMode ? Material.TNT : Material.BARRIER,
+                    "gui.delete-button", "&c削除モード: ON", "&a削除モード: OFF",
+                    null, null));
         }
 
-        Inventory inv = Bukkit.createInventory(null, guiSize, title);
+        // ホームアイコンの配置 (大 GUI ではスロット 45/53 をナビ用に予約)
+        String defaultIcon = plugin.getConfig().getString("gui.home-icon.default-material");
+        if (defaultIcon == null || defaultIcon.isEmpty()) defaultIcon = "RED_BED";
+        Material defaultMat = Material.getMaterial(defaultIcon);
+        if (defaultMat == null) defaultMat = Material.RED_BED;
+        ConfigurationSection worldIcons = plugin.getConfig().getConfigurationSection("gui.home-icon.world-icons");
 
-        // Slot 0: Create Home Button (Top Left) - Only for Owner
-        if (isOwner) {
-            ItemStack createItem = new ItemStack(Material.ANVIL);
-            ItemMeta createMeta = createItem.getItemMeta();
-            if (createMeta != null) {
-                createMeta.displayName(colorize(plugin.getConfig().getString("gui.create-button.name", "&aホームを作成する")));
-                List<String> lore = new ArrayList<>(plugin.getConfig().getStringList("gui.create-button.lore"));
+        boolean activeMode = deleteMode || publicMode || renameMode || favoriteMode || memoMode;
+        int index = page * capacity;
+        for (int slot = 9; slot < guiSize && index < visibleHomes.size(); slot++) {
+            if (large && (slot == SLOT_PREV || slot == SLOT_NEXT)) continue;
 
-                // 作成ボタンは isOwner のときだけ表示されるため、target は閲覧中の本人 (オンライン)
-                int current = homeManager.getHomes(target.getUniqueId()).size();
-                int max;
-                if (target.isOnline()) {
-                     max = homeManager.getMaxHomes((Player)target);
-                } else {
-                     max = plugin.getConfig().getInt("settings.default-home-limit", 1);
-                }
+            String homeName = visibleHomes.get(index++);
+            Location loc = homesMap.get(homeName);
+            if (loc == null || loc.getWorld() == null) continue;
 
-                lore.add("&e現在の作成数: " + current + " / " + max);
-                
-                // Show cost
-                if (economyManager != null && economyManager.hasEconomy()) {
-                     double cost = plugin.getConfig().getDouble("economy.cost.set-home", 0);
-                     if (cost > 0) {
-                         lore.add("&6費用: " + economyManager.format(cost));
-                     }
-                }
-                
-                createMeta.lore(colorizeLore(lore));
-                createItem.setItemMeta(createMeta);
+            ItemStack item = buildHomeIcon(target, homeName, loc, defaultMat, worldIcons, isOwner,
+                    deleteMode, publicMode, renameMode, favoriteMode, memoMode, activeMode);
+            inv.setItem(slot, item);
+            holder.mapSlot(slot, homeName);
+        }
+
+        if (hasPrev) inv.setItem(SLOT_PREV, buildNavButton("&a← 前のページ"));
+        if (hasNext) inv.setItem(SLOT_NEXT, buildNavButton("&a次のページ →"));
+
+        viewer.openInventory(inv);
+    }
+
+    private ItemStack buildCreateButton(OfflinePlayer target) {
+        ItemStack createItem = new ItemStack(Material.ANVIL);
+        ItemMeta createMeta = createItem.getItemMeta();
+        if (createMeta != null) {
+            createMeta.displayName(colorize(plugin.getConfig().getString("gui.create-button.name", "&aホームを作成する")));
+            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList("gui.create-button.lore"));
+
+            // 作成ボタンは isOwner のときだけ表示されるため、target は閲覧中の本人 (オンライン)
+            int current = homeManager.getHomes(target.getUniqueId()).size();
+            int max;
+            if (target.isOnline()) {
+                max = homeManager.getMaxHomes((Player) target);
+            } else {
+                max = plugin.getConfig().getInt("settings.default-home-limit", 1);
             }
-            inv.setItem(0, createItem);
-        }
+            lore.add("&e現在の作成数: " + current + " / " + max);
 
-        // Slot 2: Search Button
+            if (economyManager != null && economyManager.hasEconomy()) {
+                double cost = plugin.getConfig().getDouble("economy.cost.set-home", 0);
+                if (cost > 0) {
+                    lore.add("&6費用: " + economyManager.format(cost));
+                }
+            }
+
+            createMeta.lore(colorizeLore(lore));
+            createItem.setItemMeta(createMeta);
+        }
+        return createItem;
+    }
+
+    private ItemStack buildSearchButton(Player viewer) {
         ItemStack searchItem = new ItemStack(Material.COMPASS);
         ItemMeta searchMeta = searchItem.getItemMeta();
         if (searchMeta != null) {
             searchMeta.displayName(colorize(plugin.getConfig().getString("gui.search-button.name", "&a検索")));
-            List<String> lore = new ArrayList<>();
-            List<String> configLore = plugin.getConfig().getStringList("gui.search-button.lore");
-            if (configLore.isEmpty()) {
-                configLore = new ArrayList<>();
-                configLore.add("&7クリックして検索文字を入力");
-                configLore.add("&7'clear' で解除");
-            }
-            for (String line : configLore) {
-                lore.add(line);
+            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList("gui.search-button.lore"));
+            if (lore.isEmpty()) {
+                lore.add("&7クリックして検索文字を入力");
+                lore.add("&7'clear' で解除");
             }
             String active = sessionManager.getSearchQuery(viewer.getUniqueId());
             if (active != null && !active.isEmpty()) {
@@ -190,301 +251,111 @@ public class HomeGUI implements Listener {
             searchMeta.lore(colorizeLore(lore));
             searchItem.setItemMeta(searchMeta);
         }
-        inv.setItem(2, searchItem);
+        return searchItem;
+    }
 
-        // Slot 3: Favorite Mode Button - Only for Owner
-        if (isOwner) {
-            ItemStack favItem = new ItemStack(favoriteMode ? Material.NETHER_STAR : Material.FIREWORK_STAR);
-            ItemMeta favMeta = favItem.getItemMeta();
-            if (favMeta != null) {
-                String nameKey = favoriteMode ? "gui.favorite-button.name-on" : "gui.favorite-button.name-off";
-                String defaultName = favoriteMode ? "&eお気に入りモード: ON" : "&aお気に入りモード: OFF";
-                favMeta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
-                List<String> lore = new ArrayList<>();
-                String loreKey = favoriteMode ? "gui.favorite-button.lore-on" : "gui.favorite-button.lore-off";
-                List<String> configLore = plugin.getConfig().getStringList(loreKey);
-                if (configLore.isEmpty()) {
-                    configLore = new ArrayList<>();
-                    configLore.add(favoriteMode ? "&7クリックしてOFFにする" : "&7クリックしてONにする");
-                }
-                for (String line : configLore) {
-                    lore.add(line);
-                }
-                favMeta.lore(colorizeLore(lore));
-                favItem.setItemMeta(favMeta);
+    /** ON/OFF 2状態のモード切替ボタンを config (<keyBase>.name-on/off, lore-on/off) から組み立てる。 */
+    private ItemStack buildToggleButton(boolean on, Material material, String keyBase,
+                                        String defaultNameOn, String defaultNameOff,
+                                        String defaultLoreOn, String defaultLoreOff) {
+        ItemStack item = new ItemStack(material);
+        if (on && material == Material.NAME_TAG) {
+            item.addUnsafeEnchantment(Enchantment.UNBREAKING, 1);
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            String nameKey = on ? keyBase + ".name-on" : keyBase + ".name-off";
+            meta.displayName(colorize(plugin.getConfig().getString(nameKey, on ? defaultNameOn : defaultNameOff)));
+
+            String loreKey = on ? keyBase + ".lore-on" : keyBase + ".lore-off";
+            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList(loreKey));
+            String defaultLore = on ? defaultLoreOn : defaultLoreOff;
+            if (lore.isEmpty() && defaultLore != null) {
+                lore.add(defaultLore);
             }
-            inv.setItem(3, favItem);
+            meta.lore(colorizeLore(lore));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack buildNavButton(String name) {
+        ItemStack item = new ItemStack(Material.ARROW);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(colorize(name));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack buildHomeIcon(OfflinePlayer target, String homeName, Location loc,
+                                    Material defaultMat, ConfigurationSection worldIcons, boolean isOwner,
+                                    boolean deleteMode, boolean publicMode, boolean renameMode,
+                                    boolean favoriteMode, boolean memoMode, boolean activeMode) {
+        Material iconMat = defaultMat;
+        if (worldIcons != null) {
+            String matName = worldIcons.getString(loc.getWorld().getName());
+            if (matName != null) {
+                Material m = Material.getMaterial(matName);
+                if (m != null) iconMat = m;
+            }
         }
 
-        // Slot 4: Memo Mode Button - Only for Owner
-        if (isOwner) {
-            ItemStack memoItem = new ItemStack(memoMode ? Material.WRITABLE_BOOK : Material.BOOK);
-            ItemMeta memoMeta = memoItem.getItemMeta();
-            if (memoMeta != null) {
-                String nameKey = memoMode ? "gui.memo-button.name-on" : "gui.memo-button.name-off";
-                String defaultName = memoMode ? "&eメモ編集モード: ON" : "&aメモ編集モード: OFF";
-                memoMeta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
-                List<String> lore = new ArrayList<>();
-                String loreKey = memoMode ? "gui.memo-button.lore-on" : "gui.memo-button.lore-off";
-                List<String> configLore = plugin.getConfig().getStringList(loreKey);
-                if (configLore.isEmpty()) {
-                    configLore = new ArrayList<>();
-                    configLore.add(memoMode ? "&7クリックしてOFFにする" : "&7クリックしてONにする");
-                }
-                for (String line : configLore) {
-                    lore.add(line);
-                }
-                memoMeta.lore(colorizeLore(lore));
-                memoItem.setItemMeta(memoMeta);
-            }
-            inv.setItem(4, memoItem);
+        ItemStack item = new ItemStack(iconMat);
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return item;
+
+        String nameTmpl = plugin.getConfig().getString("gui.home-icon.name");
+        if (nameTmpl == null) nameTmpl = "&6{name}";
+        meta.displayName(colorize(nameTmpl.replace("{name}", homeName)));
+
+        List<String> lore = new ArrayList<>();
+        for (String line : plugin.getConfig().getStringList("gui.home-icon.lore")) {
+            lore.add(line.replace("{world}", loc.getWorld().getName())
+                    .replace("{x}", String.valueOf(loc.getBlockX()))
+                    .replace("{y}", String.valueOf(loc.getBlockY()))
+                    .replace("{z}", String.valueOf(loc.getBlockZ())));
         }
 
-        // Slot 8: Delete Mode Button (Top Right) - Only for Owner or Admin
-        if (isOwner || isAdmin) {
-            ItemStack deleteItem;
-            if (deleteMode) {
-                deleteItem = new ItemStack(Material.TNT);
-            } else {
-                deleteItem = new ItemStack(Material.BARRIER);
-            }
-            ItemMeta deleteMeta = deleteItem.getItemMeta();
-            if (deleteMeta != null) {
-                String nameKey = deleteMode ? "gui.delete-button.name-on" : "gui.delete-button.name-off";
-                String defaultName = deleteMode ? "&c削除モード: ON" : "&a削除モード: OFF";
-                deleteMeta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
-                
-                List<String> lore = new ArrayList<>();
-                String loreKey = deleteMode ? "gui.delete-button.lore-on" : "gui.delete-button.lore-off";
-                for (String line : plugin.getConfig().getStringList(loreKey)) {
-                    lore.add(line);
-                }
-                deleteMeta.lore(colorizeLore(lore));
-                deleteItem.setItemMeta(deleteMeta);
-            }
-            inv.setItem(8, deleteItem);
-        }
-        
-        // Slot 1: Rename Mode Button (Next to Anvil) - Only for Owner
-        if (isOwner) {
-            ItemStack renameItem;
-            if (renameMode) {
-                renameItem = new ItemStack(Material.NAME_TAG);
-                renameItem.addUnsafeEnchantment(Enchantment.UNBREAKING, 1);
-            } else {
-                renameItem = new ItemStack(Material.NAME_TAG);
-            }
-            ItemMeta renameMeta = renameItem.getItemMeta();
-            if (renameMeta != null) {
-                renameMeta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-                String nameKey = renameMode ? "gui.rename-button.name-on" : "gui.rename-button.name-off";
-                String defaultName = renameMode ? "&eリネームモード: ON" : "&aリネームモード: OFF";
-                renameMeta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
-                
-                List<String> lore = new ArrayList<>();
-                String loreKey = renameMode ? "gui.rename-button.lore-on" : "gui.rename-button.lore-off";
-                
-                List<String> defaultLore = new ArrayList<>();
-                if (renameMode) defaultLore.add("&7クリックしてモードを終了");
-                else defaultLore.add("&7クリックしてリネームモードに切替");
-                
-                List<String> configLore = plugin.getConfig().getStringList(loreKey);
-                if (configLore.isEmpty()) configLore = defaultLore;
-                
-                for (String line : configLore) {
-                    lore.add(line);
-                }
-                renameMeta.lore(colorizeLore(lore));
-                renameItem.setItemMeta(renameMeta);
-            }
-            // Slot 1: Rename Mode (Next to Anvil)
-            inv.setItem(1, renameItem);
-        }
-        
-        // Slot 7: Public Mode Button (Next to Delete) - Only for Owner
-        if (isOwner) {
-            ItemStack publicItem;
-            if (publicMode) {
-                publicItem = new ItemStack(Material.ENDER_EYE);
-            } else {
-                publicItem = new ItemStack(Material.ENDER_PEARL);
-            }
-            ItemMeta publicMeta = publicItem.getItemMeta();
-            if (publicMeta != null) {
-                String nameKey = publicMode ? "gui.public-button.name-on" : "gui.public-button.name-off";
-                String defaultName = publicMode ? "&b公開設定モード: ON" : "&a公開設定モード: OFF";
-                publicMeta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
-                
-                List<String> lore = new ArrayList<>();
-                String loreKey = publicMode ? "gui.public-button.lore-on" : "gui.public-button.lore-off";
-                // Default lore if config missing
-                List<String> defaultLore = new ArrayList<>();
-                if (publicMode) defaultLore.add("&7クリックしてモードを終了");
-                else defaultLore.add("&7クリックして公開設定モードに切替");
-                
-                List<String> configLore = plugin.getConfig().getStringList(loreKey);
-                if (configLore.isEmpty()) configLore = defaultLore;
-                
-                for (String line : configLore) {
-                    lore.add(line);
-                }
-                publicMeta.lore(colorizeLore(lore));
-                publicItem.setItemMeta(publicMeta);
-            }
-            inv.setItem(7, publicItem);
-        }
-        
-        // Pagination Logic
-        int startIndex = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
-        // Validation: if start index out of bounds, reset
-        if (startIndex >= visibleHomes.size() && !visibleHomes.isEmpty()) {
-            startIndex = 0;
-            sessionManager.setCurrentStartIndex(viewer.getUniqueId(), 0);
-            sessionManager.getPageHistory(viewer.getUniqueId()).clear();
+        boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
+        lore.add(isPublic ? "&a公開中" : "&c非公開");
+
+        if (isOwner && homeManager.isFavorite(target.getUniqueId(), homeName)) {
+            lore.add("&6★ お気に入り");
         }
 
-        boolean hasPrev = !sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty();
-        int homesDisplayed = 0;
-        
-        // Iterate slots
-        int startSlot = 9;
-        int endSlot = guiSize - 1; // 26 or 53
-        
-        // Get world icons config
-        String defaultIcon = plugin.getConfig().getString("gui.home-icon.default-material");
-        if (defaultIcon == null || defaultIcon.isEmpty()) defaultIcon = "RED_BED";
-        Material defaultMat = Material.getMaterial(defaultIcon);
-        if (defaultMat == null) defaultMat = Material.RED_BED;
-        ConfigurationSection worldIcons = plugin.getConfig().getConfigurationSection("gui.home-icon.world-icons");
+        String memo = homeManager.getMemo(target.getUniqueId(), homeName);
+        if (memo != null && !memo.isEmpty()) {
+            lore.add("&7メモ: " + memo);
+        }
 
-        for (int i = startSlot; i <= endSlot; i++) {
-            // Navigation Buttons (Only for Large GUI)
-            if (guiSize == GUI_SIZE_LARGE) {
-                if (i == 45 && hasPrev) {
-                    // Previous Button
-                    ItemStack prevItem = new ItemStack(Material.ARROW);
-                    ItemMeta prevMeta = prevItem.getItemMeta();
-                    if (prevMeta != null) {
-                        prevMeta.displayName(colorize("&a← 前のページ"));
-                        prevItem.setItemMeta(prevMeta);
-                    }
-                    inv.setItem(i, prevItem);
-                    continue;
+        List<String> actionLore = new ArrayList<>();
+        if (deleteMode) {
+            actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-delete");
+        } else if (publicMode) {
+            actionLore.add("&eクリックして公開/非公開を切り替え");
+        } else if (renameMode) {
+            actionLore.add("&eクリックして名前を変更");
+        } else if (favoriteMode) {
+            actionLore.add("&eクリックしてお気に入りを切り替え");
+        } else if (memoMode) {
+            actionLore.add("&eクリックしてメモを編集");
+        } else {
+            actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-teleport");
+            if (economyManager != null && economyManager.hasEconomy()) {
+                double cost = plugin.getConfig().getDouble("economy.cost.teleport", 0);
+                if (cost > 0) {
+                    lore.add("&6テレポート費用: " + economyManager.format(cost));
                 }
-                if (i == 53) {
-                    // Check if we need Next Button
-                    // Items remaining to show including this one
-                    int remaining = visibleHomes.size() - (startIndex + homesDisplayed);
-                    if (remaining > 1) { // Need more than just this slot
-                        // Next Button
-                        ItemStack nextItem = new ItemStack(Material.ARROW);
-                        ItemMeta nextMeta = nextItem.getItemMeta();
-                        if (nextMeta != null) {
-                            nextMeta.displayName(colorize("&a次のページ →"));
-                            nextItem.setItemMeta(nextMeta);
-                        }
-                        inv.setItem(i, nextItem);
-                        continue;
-                    }
-                }
-            }
-
-            // Place Home
-            if (startIndex + homesDisplayed < visibleHomes.size()) {
-                String homeName = visibleHomes.get(startIndex + homesDisplayed);
-                Location loc = homesMap.get(homeName);
-                boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
-                if (loc == null || loc.getWorld() == null) {
-                    homesDisplayed++;
-                    continue;
-                }
-                
-                // Determine icon material based on world
-                Material iconMat = defaultMat;
-                if (worldIcons != null) {
-                    String worldName = loc.getWorld().getName();
-                    String matName = worldIcons.getString(worldName);
-                    if (matName != null) {
-                        Material m = Material.getMaterial(matName);
-                        if (m != null) iconMat = m;
-                    }
-                }
-
-                ItemStack item = new ItemStack(iconMat);
-                ItemMeta meta = item.getItemMeta();
-                if (meta != null) {
-                    String nameTmpl = plugin.getConfig().getString("gui.home-icon.name");
-                    if (nameTmpl == null) nameTmpl = "&6{name}";
-                    meta.displayName(colorize(nameTmpl.replace("{name}", homeName)));
-                    
-                    List<String> lore = new ArrayList<>();
-                    
-                    // Add base lore
-                    for (String line : plugin.getConfig().getStringList("gui.home-icon.lore")) {
-                        String l = line.replace("{world}", loc.getWorld().getName())
-                                       .replace("{x}", String.valueOf(loc.getBlockX()))
-                                       .replace("{y}", String.valueOf(loc.getBlockY()))
-                                       .replace("{z}", String.valueOf(loc.getBlockZ()));
-                        lore.add(l);
-                    }
-                    
-                    // Public Status
-                    if (isPublic) {
-                        lore.add("&a公開中");
-                    } else {
-                        lore.add("&c非公開");
-                    }
-
-                if (isOwner && homeManager.isFavorite(target.getUniqueId(), homeName)) {
-                    lore.add("&6★ お気に入り");
-                }
-
-                String memo = homeManager.getMemo(target.getUniqueId(), homeName);
-                if (memo != null && !memo.isEmpty()) {
-                    lore.add("&7メモ: " + memo);
-                }
-                    
-                    // Add action specific lore
-                    List<String> actionLore = new ArrayList<>(); // Initialize empty
-                    if (deleteMode) {
-                        actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-delete");
-                    } else if (publicMode) {
-                         actionLore.add("&eクリックして公開/非公開を切り替え");
-                    } else if (renameMode) {
-                         actionLore.add("&eクリックして名前を変更");
-                    } else if (favoriteMode) {
-                         actionLore.add("&eクリックしてお気に入りを切り替え");
-                    } else if (memoMode) {
-                         actionLore.add("&eクリックしてメモを編集");
-                    } else {
-                        actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-teleport");
-                        // Show cost if not owner and cost enabled
-                        if (economyManager != null && economyManager.hasEconomy()) {
-                             double cost = plugin.getConfig().getDouble("economy.cost.teleport", 0);
-                             if (cost > 0) {
-                                 lore.add("&6テレポート費用: " + economyManager.format(cost));
-                             }
-                        }
-                    }
-                    
-                    for (String line : actionLore) {
-                        lore.add(line);
-                    }
-                    
-                    meta.lore(colorizeLore(lore));
-                    item.setItemMeta(meta);
-                }
-                
-                inv.setItem(i, item);
-                homesDisplayed++;
-            } else {
-                break; // No more homes
             }
         }
-        
-        sessionManager.setLastPageSize(viewer.getUniqueId(), homesDisplayed);
+        lore.addAll(actionLore);
 
-        viewer.openInventory(inv);
+        meta.lore(colorizeLore(lore));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private Component colorize(String text) {
@@ -501,347 +372,204 @@ public class HomeGUI implements Listener {
         return out;
     }
 
-    private String plain(Component component) {
-        if (component == null) return "";
-        return PLAIN.serialize(component);
-    }
-    
-    private List<String> getVisibleHomes(Player viewer, OfflinePlayer target, Map<String, Location> homes) {
-        List<String> visibleHomes = new ArrayList<>();
+    /** 閲覧者に見せてよいホーム名を検索フィルタ・ソート (オーナーはお気に入り優先) 適用済みで返す。 */
+    private List<String> computeVisibleHomes(Player viewer, OfflinePlayer target, Map<String, Location> homes) {
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());
         boolean isAdmin = viewer.hasPermission("homes.admin") && !isOwner;
-        
+        UUID targetUuid = target.getUniqueId();
+
+        List<String> visibleHomes = new ArrayList<>();
         for (String name : homes.keySet()) {
-            boolean isPublic = homeManager.isPublic(target.getUniqueId(), name);
-            if (isOwner || isAdmin || isPublic) {
+            if (isOwner || isAdmin || homeManager.isPublic(targetUuid, name)) {
                 visibleHomes.add(name);
             }
+        }
+
+        String query = sessionManager.getSearchQuery(viewer.getUniqueId());
+        if (query != null && !query.isEmpty()) {
+            String qLower = query.toLowerCase();
+            visibleHomes.removeIf(n -> !n.toLowerCase().contains(qLower));
+        }
+
+        if (isOwner) {
+            visibleHomes.sort((a, b) -> {
+                boolean af = homeManager.isFavorite(targetUuid, a);
+                boolean bf = homeManager.isFavorite(targetUuid, b);
+                if (af != bf) return af ? -1 : 1;
+                return a.compareToIgnoreCase(b);
+            });
+        } else {
+            visibleHomes.sort(String::compareToIgnoreCase);
         }
         return visibleHomes;
     }
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        // Check both titles (Normal and Delete Mode) - AND match flexible titles if possible
-        String title = plain(event.getView().title());
-        // Simple check
-        if (!title.contains("ホーム") && !title.contains("削除") && !title.contains("公開") && !title.contains("リネーム") && !title.contains("お気に入り") && !title.contains("メモ")) {
-             return;
-        }
-        // Better: Check if title equals config strings
-        String normalTitle = plain(colorize(plugin.getConfig().getString("gui.title", "ホーム一覧")));
-        String deleteTitle = plain(colorize(plugin.getConfig().getString("gui.delete-mode-title", "&c削除モード (クリックで削除)")));
-        String publicTitle = plain(colorize(plugin.getConfig().getString("gui.public-mode-title", "&b公開設定モード (クリックで切替)")));
-        String renameTitle = plain(colorize(plugin.getConfig().getString("gui.rename-mode-title", "&eリネームモード (クリックで名前変更)")));
-        String favoriteTitle = plain(colorize(plugin.getConfig().getString("gui.favorite-mode-title", "&eお気に入りモード (クリックで切替)")));
-        String memoTitle = plain(colorize(plugin.getConfig().getString("gui.memo-mode-title", "&eメモ編集モード (クリックで編集)")));
-        
-        // Allow other titles for Admin view (e.g. "User's Homes")
-        boolean isMyGui = title.equals(normalTitle) || title.equals(deleteTitle) || title.equals(publicTitle) || title.equals(renameTitle) || title.equals(favoriteTitle) || title.equals(memoTitle) || title.contains("のホーム"); 
-        
-        if (!isMyGui) return;
+        Inventory top = event.getView().getTopInventory();
+        if (!(top.getHolder() instanceof HomeGuiHolder holder)) return;
 
-        event.setCancelled(true); // Prevent taking items
+        event.setCancelled(true);
 
-        if (event.getClickedInventory() != event.getView().getTopInventory()) {
-             // Clicked bottom inventory, allow unless shift-clicking into top
-             if (event.isShiftClick()) {
-                 event.setCancelled(true);
-             }
-             return;
-        }
+        if (event.getClickedInventory() != top) return;
 
         ItemStack clickedItem = event.getCurrentItem();
-        if (clickedItem == null || clickedItem.getType() == Material.AIR) {
-            return;
-        }
+        if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
 
         Player viewer = (Player) event.getWhoClicked();
-        
-        // Determine target (owner of homes)
-        // If title is default, target is viewer. If title is "X's Home", target is X.
-        OfflinePlayer target = viewer;
-        if (title.contains("のホーム")) {
-            String targetName = title.replace("のホーム", "");
-            UUID targetUuid = homeManager.resolveOwnerUuid(targetName);
-            if (targetUuid == null) {
-                viewer.closeInventory();
-                return;
-            }
-            target = Bukkit.getOfflinePlayer(targetUuid);
-        }
-        
+        OfflinePlayer target = Bukkit.getOfflinePlayer(holder.getTargetUuid());
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());
-        
+        UUID viewerUuid = viewer.getUniqueId();
         int slot = event.getSlot();
 
-        // Handle Navigation Buttons (Prev: 45, Next: 53)
-        // Check if item name is "Next Page" or "Previous Page" (or matches config if we had it)
-        if (clickedItem.getType() == Material.ARROW && clickedItem.hasItemMeta()) {
-            ItemMeta meta = clickedItem.getItemMeta();
-            String displayName = meta != null ? plain(meta.displayName()) : "";
-            if (displayName.contains("次のページ")) {
-                // Next Page
-                int currentStart = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
-                int displayed = sessionManager.getLastPageSize(viewer.getUniqueId());
-                
-                sessionManager.getPageHistory(viewer.getUniqueId()).push(currentStart);
-                sessionManager.setCurrentStartIndex(viewer.getUniqueId(), currentStart + displayed);
-                
-                soundManager.play(viewer, "gui-click");
-                open(viewer, target);
-                return;
-            } else if (displayName.contains("前のページ")) {
-                // Previous Page
-                if (!sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty()) {
-                    int prevStart = sessionManager.getPageHistory(viewer.getUniqueId()).pop();
-                    sessionManager.setCurrentStartIndex(viewer.getUniqueId(), prevStart);
-                    
+        switch (slot) {
+            case SLOT_PREV -> {
+                if (holder.hasPrev()) {
+                    sessionManager.setPage(viewerUuid, sessionManager.getPage(viewerUuid) - 1);
                     soundManager.play(viewer, "gui-click");
                     open(viewer, target);
                 }
                 return;
             }
+            case SLOT_NEXT -> {
+                if (holder.hasNext()) {
+                    sessionManager.setPage(viewerUuid, sessionManager.getPage(viewerUuid) + 1);
+                    soundManager.play(viewer, "gui-click");
+                    open(viewer, target);
+                }
+                return;
+            }
+            case SLOT_CREATE -> {
+                if (isOwner && inputListener != null) {
+                    inputListener.startCreation(viewer);
+                }
+                return;
+            }
+            case SLOT_SEARCH -> {
+                if (inputListener != null) {
+                    inputListener.startSearch(viewer);
+                }
+                return;
+            }
+            case SLOT_RENAME -> {
+                if (isOwner) toggleMode(viewer, target, Mode.RENAME);
+                return;
+            }
+            case SLOT_FAVORITE -> {
+                if (isOwner) toggleMode(viewer, target, Mode.FAVORITE);
+                return;
+            }
+            case SLOT_MEMO -> {
+                if (isOwner) toggleMode(viewer, target, Mode.MEMO);
+                return;
+            }
+            case SLOT_PUBLIC -> {
+                if (isOwner) toggleMode(viewer, target, Mode.PUBLIC);
+                return;
+            }
+            case SLOT_DELETE -> {
+                toggleMode(viewer, target, Mode.DELETE);
+                return;
+            }
+            default -> {
+            }
         }
 
-        // Create Home Button at Slot 0
-        if (slot == 0 && isOwner) {
+        String homeName = holder.homeAt(slot);
+        if (homeName == null) return;
+
+        if (sessionManager.isDeleteMode(viewerUuid)) {
+            if (confirmGUI != null) {
+                confirmGUI.open(viewer, holder.getTargetUuid(), homeName);
+                soundManager.play(viewer, "gui-click");
+            }
+        } else if (sessionManager.isRenameMode(viewerUuid) && isOwner) {
             if (inputListener != null) {
-                inputListener.startCreation(viewer);
+                inputListener.startRename(viewer, homeName);
             }
-            return;
-        }
-
-        // Search Button at Slot 2
-        if (slot == 2) {
+        } else if (sessionManager.isFavoriteMode(viewerUuid) && isOwner) {
+            boolean isFav = homeManager.isFavorite(target.getUniqueId(), homeName);
+            homeManager.setFavorite(target.getUniqueId(), homeName, !isFav);
+            soundManager.play(viewer, "gui-click");
+            sessionManager.setFavoriteMode(viewerUuid, false);
+            open(viewer, target);
+        } else if (sessionManager.isMemoMode(viewerUuid) && isOwner) {
             if (inputListener != null) {
-                inputListener.startSearch(viewer);
+                inputListener.startEditMemo(viewer, homeName);
             }
-            return;
-        }
+        } else if (sessionManager.isPublicMode(viewerUuid) && isOwner) {
+            boolean newState = !homeManager.isPublic(target.getUniqueId(), homeName);
 
-        // Rename Mode Button at Slot 1
-        if (slot == 1 && isOwner) {
-            if (sessionManager.isRenameMode(viewer.getUniqueId())) {
-                sessionManager.setRenameMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            } else {
-                sessionManager.setRenameMode(viewer.getUniqueId(), true);
-                // Disable other modes
-                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
-                sessionManager.setPublicMode(viewer.getUniqueId(), false);
-                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
-                sessionManager.setMemoMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
+            // 公開に切り替えるときのみ費用を徴収する
+            if (newState && economyManager != null && economyManager.hasEconomy()) {
+                double cost = plugin.getConfig().getDouble("economy.cost.make-public", 0);
+                if (cost > 0 && !economyManager.hasMoney(viewer, cost)) {
+                    viewer.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
+                    return;
+                }
+                if (cost > 0) {
+                    economyManager.withdraw(viewer, cost);
+                    viewer.sendMessage(plugin.getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
+                }
             }
-            open(viewer, target); 
-            return;
-        }
 
-        // Favorite Mode Button at Slot 3
-        if (slot == 3 && isOwner) {
-            if (sessionManager.isFavoriteMode(viewer.getUniqueId())) {
-                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            } else {
-                sessionManager.setFavoriteMode(viewer.getUniqueId(), true);
-                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
-                sessionManager.setPublicMode(viewer.getUniqueId(), false);
-                sessionManager.setRenameMode(viewer.getUniqueId(), false);
-                sessionManager.setMemoMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            }
+            homeManager.setPublic(target.getUniqueId(), homeName, newState);
+            sessionManager.setPublicMode(viewerUuid, false);
+            soundManager.play(viewer, "gui-click");
             open(viewer, target);
-            return;
-        }
-
-        // Memo Mode Button at Slot 4
-        if (slot == 4 && isOwner) {
-            if (sessionManager.isMemoMode(viewer.getUniqueId())) {
-                sessionManager.setMemoMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            } else {
-                sessionManager.setMemoMode(viewer.getUniqueId(), true);
-                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
-                sessionManager.setPublicMode(viewer.getUniqueId(), false);
-                sessionManager.setRenameMode(viewer.getUniqueId(), false);
-                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            }
-            open(viewer, target);
-            return;
-        }
-
-        // Delete Mode Button at Slot 8
-        if (slot == 8) {
-            if (sessionManager.isDeleteMode(viewer.getUniqueId())) {
-                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            } else {
-                sessionManager.setDeleteMode(viewer.getUniqueId(), true);
-                // Disable other modes
-                sessionManager.setPublicMode(viewer.getUniqueId(), false);
-                sessionManager.setRenameMode(viewer.getUniqueId(), false);
-                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
-                sessionManager.setMemoMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            }
-            open(viewer, target); 
-            return;
-        }
-
-        // Public Mode Button at Slot 7
-        if (slot == 7 && isOwner) {
-            if (sessionManager.isPublicMode(viewer.getUniqueId())) {
-                sessionManager.setPublicMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            } else {
-                sessionManager.setPublicMode(viewer.getUniqueId(), true);
-                // Disable other modes
-                sessionManager.setDeleteMode(viewer.getUniqueId(), false);
-                sessionManager.setRenameMode(viewer.getUniqueId(), false);
-                sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
-                sessionManager.setMemoMode(viewer.getUniqueId(), false);
-                soundManager.play(viewer, "gui-click");
-            }
-            open(viewer, target); 
-            return;
-        }
-
-        // Home Items (Slot 9-53)
-        if (slot >= 9 && slot <= 53) {
-            if (clickedItem.hasItemMeta() && clickedItem.getItemMeta().hasDisplayName()) {
-
-                // 描画時と同じ並び・フィルタを再現してスロット→ホーム名を逆引きする
-                Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
-                List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
-                String query = sessionManager.getSearchQuery(viewer.getUniqueId());
-                if (query != null && !query.isEmpty()) {
-                    String qLower = query.toLowerCase();
-                    visibleHomes.removeIf(n -> !n.toLowerCase().contains(qLower));
+        } else {
+            if (economyManager != null && economyManager.hasEconomy()) {
+                double cost = plugin.getConfig().getDouble("economy.cost.teleport", 0);
+                if (cost > 0 && !economyManager.hasMoney(viewer, cost)) {
+                    viewer.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
+                    return;
                 }
-                Collections.sort(visibleHomes);
-                boolean isOwnerClick = viewer.getUniqueId().equals(target.getUniqueId());
-                if (isOwnerClick) {
-                    UUID targetUuid = target.getUniqueId();
-                    visibleHomes.sort((a, b) -> {
-                        boolean af = homeManager.isFavorite(targetUuid, a);
-                        boolean bf = homeManager.isFavorite(targetUuid, b);
-                        if (af != bf) return af ? -1 : 1;
-                        return a.compareToIgnoreCase(b);
-                    });
-                }
-                
-                int startIndex = sessionManager.getCurrentStartIndex(viewer.getUniqueId());
-                boolean hasPrev = !sessionManager.getPageHistory(viewer.getUniqueId()).isEmpty();
-                int guiSize = visibleHomes.size() > 18 ? GUI_SIZE_LARGE : GUI_SIZE_SMALL;
-                
-                // Simulate loop to find which home matches this slot
-                int currentSlot = 9;
-                int endSlot = guiSize - 1;
-                int homeIndex = startIndex;
-                String matchedHome = null;
-                
-                for (int i = currentSlot; i <= endSlot; i++) {
-                    if (guiSize == GUI_SIZE_LARGE) {
-                        if (i == 45 && hasPrev) continue; // Skip Prev Button
-                        if (i == 53) {
-                            int remaining = visibleHomes.size() - homeIndex;
-                            if (remaining > 1) continue; // Skip Next Button
-                        }
-                    }
-                    
-                    if (i == slot) {
-                        // Found clicked slot
-                        if (homeIndex < visibleHomes.size()) {
-                            matchedHome = visibleHomes.get(homeIndex);
-                        }
-                        break;
-                    }
-                    
-                    homeIndex++;
-                }
-
-                if (matchedHome != null) {
-                    String homeName = matchedHome;
-                    
-                    if (sessionManager.isDeleteMode(viewer.getUniqueId())) {
-                        // Delete Mode Logic (existing)
-                         new ConfirmGUI(plugin, homeManager, this, homeName, soundManager, target.getUniqueId(), sessionManager).open(viewer);
-                         soundManager.play(viewer, "gui-click");
-                    } else if (sessionManager.isRenameMode(viewer.getUniqueId()) && isOwner) {
-                        // Rename Logic
-                        if (inputListener != null) {
-                            inputListener.startRename(viewer, homeName);
-                        }
-                    } else if (sessionManager.isFavoriteMode(viewer.getUniqueId()) && isOwner) {
-                        boolean isFav = homeManager.isFavorite(target.getUniqueId(), homeName);
-                        homeManager.setFavorite(target.getUniqueId(), homeName, !isFav);
-                        soundManager.play(viewer, "gui-click");
-                        sessionManager.setFavoriteMode(viewer.getUniqueId(), false);
-                        open(viewer, target);
-                    } else if (sessionManager.isMemoMode(viewer.getUniqueId()) && isOwner) {
-                        if (inputListener != null) {
-                            inputListener.startEditMemo(viewer, homeName);
-                        }
-                    } else if (sessionManager.isPublicMode(viewer.getUniqueId()) && isOwner) {
-                        // Public Mode Logic
-                        boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
-                        boolean newState = !isPublic;
-                        
-                        // Economy check for making public (only when turning ON)
-                        if (newState && economyManager != null && economyManager.hasEconomy()) {
-                             double cost = plugin.getConfig().getDouble("economy.cost.make-public", 0);
-                             if (cost > 0 && !economyManager.hasMoney(viewer, cost)) {
-                                viewer.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
-                                return;
-                            }
-                            if (cost > 0) {
-                                economyManager.withdraw(viewer, cost);
-                                viewer.sendMessage(plugin.getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
-                            }
-                        }
-                        
-                        homeManager.setPublic(target.getUniqueId(), homeName, newState);
-                        sessionManager.setPublicMode(viewer.getUniqueId(), false);
-                        soundManager.play(viewer, "gui-click");
-
-                        // Re-open to update icon
-                        open(viewer, target);
-                    } else {
-                        // Teleport Logic (existing)
-                        // Economy Check for TP
-                         if (economyManager != null && economyManager.hasEconomy()) {
-                             double cost = plugin.getConfig().getDouble("economy.cost.teleport", 0);
-                             if (cost > 0 && !economyManager.hasMoney(viewer, cost)) {
-                                viewer.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
-                                return;
-                            }
-                            if (cost > 0) {
-                                economyManager.withdraw(viewer, cost);
-                                viewer.sendMessage(plugin.getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
-                            }
-                        }
-                        
-                        viewer.closeInventory();
-                        Location loc = homeManager.getHome(target.getUniqueId(), homeName);
-                        teleportManager.teleport(viewer, loc);
-                    }
+                if (cost > 0) {
+                    economyManager.withdraw(viewer, cost);
+                    viewer.sendMessage(plugin.getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
                 }
             }
+
+            viewer.closeInventory();
+            Location loc = homeManager.getHome(target.getUniqueId(), homeName);
+            teleportManager.teleport(viewer, loc);
         }
     }
-    
+
+    private enum Mode { DELETE, PUBLIC, RENAME, FAVORITE, MEMO }
+
+    /** 指定モードをトグルし、ON にした場合は他のモードを全て OFF にして GUI を開き直す。 */
+    private void toggleMode(Player viewer, OfflinePlayer target, Mode mode) {
+        UUID uuid = viewer.getUniqueId();
+        boolean current = switch (mode) {
+            case DELETE -> sessionManager.isDeleteMode(uuid);
+            case PUBLIC -> sessionManager.isPublicMode(uuid);
+            case RENAME -> sessionManager.isRenameMode(uuid);
+            case FAVORITE -> sessionManager.isFavoriteMode(uuid);
+            case MEMO -> sessionManager.isMemoMode(uuid);
+        };
+        boolean next = !current;
+
+        sessionManager.setDeleteMode(uuid, mode == Mode.DELETE && next);
+        sessionManager.setPublicMode(uuid, mode == Mode.PUBLIC && next);
+        sessionManager.setRenameMode(uuid, mode == Mode.RENAME && next);
+        sessionManager.setFavoriteMode(uuid, mode == Mode.FAVORITE && next);
+        sessionManager.setMemoMode(uuid, mode == Mode.MEMO && next);
+
+        soundManager.play(viewer, "gui-click");
+        open(viewer, target);
+    }
+
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        String title = plain(event.getView().title());
-        if (title.contains("ホーム") || title.contains("削除") || title.contains("公開") || title.contains("リネーム") || title.contains("お気に入り") || title.contains("メモ")) {
+        if (event.getView().getTopInventory().getHolder() instanceof HomeGuiHolder) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
+        if (!(event.getInventory().getHolder() instanceof HomeGuiHolder)) return;
         if (event.getReason() != InventoryCloseEvent.Reason.OPEN_NEW) {
             UUID uuid = event.getPlayer().getUniqueId();
             if (!sessionManager.isWaitingForInput(uuid)) {

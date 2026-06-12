@@ -1,9 +1,7 @@
 package com.example.homes.gui;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
@@ -13,18 +11,17 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 import com.example.homes.HomesPlugin;
+import com.example.homes.gui.holder.TpaActionGuiHolder;
 import com.example.homes.manager.TpaManager;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 public class TpaActionGUI implements Listener {
 
@@ -35,12 +32,9 @@ public class TpaActionGUI implements Listener {
     private static final int SLOT_BACK = 22;
 
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();
-    private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     private final HomesPlugin plugin;
     private final TpaGUI tpaGUI;
-
-    private final Map<UUID, UUID> selectedTarget = new HashMap<>();
 
     public TpaActionGUI(HomesPlugin plugin, TpaGUI tpaGUI) {
         this.plugin = plugin;
@@ -48,11 +42,11 @@ public class TpaActionGUI implements Listener {
     }
 
     public void open(Player viewer, Player target) {
-        selectedTarget.put(viewer.getUniqueId(), target.getUniqueId());
-
+        TpaActionGuiHolder holder = new TpaActionGuiHolder(target.getUniqueId());
         String titleTmpl = plugin.getConfig().getString("gui.tpa-action.title", "&a{player}にリクエスト");
         Component title = colorize(titleTmpl.replace("{player}", target.getName()));
-        Inventory inv = Bukkit.createInventory(null, GUI_SIZE, title);
+        Inventory inv = Bukkit.createInventory(holder, GUI_SIZE, title);
+        holder.setInventory(inv);
 
         ItemStack border = createBorder();
         for (int i = 0; i < GUI_SIZE; i++) inv.setItem(i, border);
@@ -129,11 +123,12 @@ public class TpaActionGUI implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-        if (!isThisGui(event.getView().title())) return;
+        Inventory top = event.getView().getTopInventory();
+        if (!(top.getHolder() instanceof TpaActionGuiHolder holder)) return;
 
         event.setCancelled(true);
 
-        if (event.getClickedInventory() != event.getView().getTopInventory()) return;
+        if (event.getClickedInventory() != top) return;
 
         Player viewer = (Player) event.getWhoClicked();
         int slot = event.getSlot();
@@ -146,12 +141,7 @@ public class TpaActionGUI implements Listener {
         }
 
         if (slot == SLOT_TPA || slot == SLOT_TPAHERE) {
-            UUID targetUuid = selectedTarget.get(viewer.getUniqueId());
-            if (targetUuid == null) {
-                viewer.closeInventory();
-                return;
-            }
-            Player target = Bukkit.getPlayer(targetUuid);
+            Player target = Bukkit.getPlayer(holder.getTargetUuid());
             if (target == null) {
                 viewer.sendMessage(plugin.getMessage("player-not-found"));
                 tpaGUI.open(viewer);
@@ -162,37 +152,18 @@ public class TpaActionGUI implements Listener {
                     ? TpaManager.RequestType.TPA
                     : TpaManager.RequestType.TPAHERE;
             plugin.getTpaManager().sendRequest(viewer, target, type);
-            selectedTarget.remove(viewer.getUniqueId());
         }
     }
 
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
-        if (isThisGui(event.getView().title())) {
+        if (event.getView().getTopInventory().getHolder() instanceof TpaActionGuiHolder) {
             event.setCancelled(true);
         }
-    }
-
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        selectedTarget.remove(event.getPlayer().getUniqueId());
-    }
-
-    private boolean isThisGui(Component viewTitle) {
-        String tmpl = plugin.getConfig().getString("gui.tpa-action.title", "&a{player}にリクエスト");
-        String markerColored = tmpl.replace("{player}", "");
-        String markerPlain = plain(colorize(markerColored));
-        String actual = plain(viewTitle);
-        return !markerPlain.isEmpty() && actual.contains(markerPlain);
     }
 
     private Component colorize(String text) {
         if (text == null) return Component.empty();
         return LEGACY_AMPERSAND.deserialize(text);
-    }
-
-    private String plain(Component c) {
-        if (c == null) return "";
-        return PLAIN.serialize(c);
     }
 }
