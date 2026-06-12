@@ -501,16 +501,8 @@ public class HomeGUI implements Listener {
             boolean newState = !homeManager.isPublic(target.getUniqueId(), homeName);
 
             // 公開に切り替えるときのみ費用を徴収する
-            if (newState && economyManager != null && economyManager.hasEconomy()) {
-                double cost = plugin.getConfig().getDouble("economy.cost.make-public", 0);
-                if (cost > 0 && !economyManager.hasMoney(viewer, cost)) {
-                    viewer.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
-                    return;
-                }
-                if (cost > 0) {
-                    economyManager.withdraw(viewer, cost);
-                    viewer.sendMessage(plugin.getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
-                }
+            if (newState && !economyManager.charge(viewer, "make-public")) {
+                return;
             }
 
             homeManager.setPublic(target.getUniqueId(), homeName, newState);
@@ -518,16 +510,8 @@ public class HomeGUI implements Listener {
             soundManager.play(viewer, "gui-click");
             open(viewer, target);
         } else {
-            if (economyManager != null && economyManager.hasEconomy()) {
-                double cost = plugin.getConfig().getDouble("economy.cost.teleport", 0);
-                if (cost > 0 && !economyManager.hasMoney(viewer, cost)) {
-                    viewer.sendMessage(plugin.getMessage("insufficient-funds").replace("{cost}", economyManager.format(cost)));
-                    return;
-                }
-                if (cost > 0) {
-                    economyManager.withdraw(viewer, cost);
-                    viewer.sendMessage(plugin.getMessage("payment-success").replace("{cost}", economyManager.format(cost)));
-                }
+            if (!economyManager.charge(viewer, "teleport")) {
+                return;
             }
 
             viewer.closeInventory();

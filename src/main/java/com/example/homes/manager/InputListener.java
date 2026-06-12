@@ -23,15 +23,17 @@ public class InputListener implements Listener {
     private final HomeManager homeManager;
     private final SessionManager sessionManager;
     private final SoundManager soundManager;
+    private final EconomyManager economyManager;
     private HomeGUI homeGUI;
     private final Map<UUID, Long> lastChatEventNanos = new ConcurrentHashMap<>();
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
 
-    public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager) {
+    public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager, EconomyManager economyManager) {
         this.plugin = plugin;
         this.homeManager = homeManager;
         this.sessionManager = sessionManager;
         this.soundManager = soundManager;
+        this.economyManager = economyManager;
     }
 
     public void setHomeGUI(HomeGUI homeGUI) {
@@ -291,6 +293,12 @@ public class InputListener implements Listener {
 
         if (!homeManager.canSetHome(player)) {
             player.sendMessage(plugin.getMessage("max-homes-reached").replace("{max}", String.valueOf(homeManager.getMaxHomes(player))));
+            sessionManager.setCreatingHome(uuid, false);
+            return;
+        }
+
+        // 作成ボタンの説明に表示している費用を /sethome と同様に徴収する
+        if (!economyManager.charge(player, "set-home")) {
             sessionManager.setCreatingHome(uuid, false);
             return;
         }
