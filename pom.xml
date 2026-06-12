@@ -9,12 +9,12 @@
     <packaging>jar</packaging>
 
     <name>HomesPlugin</name>
-    <url>https://github.com/naonao0319/homes-plugin</url>
+    <url>https://github.com/paper0319/homes-plugin</url>
 
     <scm>
-        <connection>scm:git:git://github.com/naonao0319/homes-plugin.git</connection>
-        <developerConnection>scm:git:ssh://github.com:naonao0319/homes-plugin.git</developerConnection>
-        <url>https://github.com/naonao0319/homes-plugin</url>
+        <connection>scm:git:git://github.com/paper0319/homes-plugin.git</connection>
+        <developerConnection>scm:git:ssh://github.com:paper0319/homes-plugin.git</developerConnection>
+        <url>https://github.com/paper0319/homes-plugin</url>
     </scm>
 
     <properties>
@@ -27,33 +27,10 @@
             <id>papermc-repo</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
-        <repository>
-            <id>sonatype</id>
-            <url>https://oss.sonatype.org/content/groups/public/</url>
-        </repository>
+        <!-- VaultAPI -->
         <repository>
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
-        </repository>
-        <repository>
-            <id>opencollab-snapshot-repo</id>
-            <url>https://repo.opencollab.dev/maven-snapshots/</url>
-            <releases>
-                 <enabled>true</enabled>
-             </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>opencollab-releases-repo</id>
-            <url>https://repo.opencollab.dev/maven-releases/</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
         </repository>
     </repositories>
 
@@ -75,14 +52,9 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>6.2.0</version>
+            <version>7.0.2</version>
             <scope>compile</scope>
         </dependency>
-        <!-- MariaDB Driver (Server usually provides this, but good to have) -->
-        <!-- Since we shade, we might need to be careful not to conflict if server provides it.
-             However, usually server provides MySQL/MariaDB driver.
-             Let's include it to be safe for standalone usage or rely on server if provided.
-             For now, let's assume we shade it or it's available. -->
         <!-- Vault API -->
         <dependency>
             <groupId>com.github.MilkBowl</groupId>
@@ -124,7 +96,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
+                <version>3.14.0</version>
                 <configuration>
                     <release>${java.version}</release>
                 </configuration>
@@ -152,10 +124,16 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <!-- <finalName>home-plugin.${project.version}</finalName> Removed to use standard naming -->
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <minimizeJar>false</minimizeJar>
-                            <!-- Removing artifactSet to shade all compile dependencies -->
+                            <artifactSet>
+                                <excludes>
+                                    <!-- Paper が実行時に提供するため同梱不要 -->
+                                    <exclude>org.slf4j:slf4j-api</exclude>
+                                    <!-- paper-api の推移的依存が compile スコープで漏れてくるが未使用 -->
+                                    <exclude>commons-codec:commons-codec</exclude>
+                                </excludes>
+                            </artifactSet>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
@@ -163,6 +141,7 @@
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/maven/**</exclude>
                                         <exclude>META-INF/versions/9/module-info.class</exclude>
                                         <exclude>module-info.class</exclude>
                                     </excludes>

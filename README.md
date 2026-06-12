@@ -33,20 +33,20 @@ This plugin allows players to set multiple homes, manage them via a GUI, share t
 
 | Command | Description | Permission |
 | --- | --- | --- |
-| `/sethome <name>` | Set a home at your current location. | `homes.use` |
-| `/delhome <name>` | Delete a specific home. | `homes.use` |
-| `/home <name>` | Teleport to a specific home. | `homes.use` |
-| `/homes` | Open your home management GUI. | `homes.use` |
+| `/sethome <name>` | Set a home at your current location. | — |
+| `/delhome <name>` | Delete a specific home. | — |
+| `/home <name>` | Teleport to a specific home. | — |
+| `/homes` | Open your home management GUI. | — |
 | `/homes reload` | Reload the plugin configuration. | `homes.reload` |
-| `/vhome <player>` | Open another player's public home list. | `homes.use` |
-| `/tpa <player>` | Request to teleport to another player. | `homes.use` |
-| `/tpahere <player>` | Request another player to teleport to you. | `homes.use` |
-| `/tpaccept` | Accept a teleport request. | `homes.use` |
-| `/tpdeny` | Deny a teleport request. | `homes.use` |
-| `/tpcancel <player>` | Cancel a sent teleport request. | `homes.use` |
-| `/tpatoggle` | Toggle receiving teleport requests. | `homes.use` |
-| `/tpaignore <player>` | Ignore teleport requests from a specific player. | `homes.use` |
-| `/back` | Teleport to your previous location or death point. | `homes.use` |
+| `/vhome <player>` | Open another player's public home list. | — |
+| `/tpa <player>` | Request to teleport to another player. | — |
+| `/tpahere <player>` | Request another player to teleport to you. | — |
+| `/tpaccept` | Accept a teleport request. | — |
+| `/tpdeny` | Deny a teleport request. | — |
+| `/tpcancel <player>` | Cancel a sent teleport request. | — |
+| `/tpatoggle` | Toggle receiving teleport requests. | — |
+| `/tpaignore <player>` | Ignore teleport requests from a specific player. | — |
+| `/back` | Teleport to your previous location or death point. | — |
 
 ### ⚙️ Configuration
 
@@ -124,20 +124,20 @@ Developed by **naonao**.
 
 | コマンド | 説明 | 権限 |
 | --- | --- | --- |
-| `/sethome <名前>` | 現在地をホームとして設定します。 | `homes.use` |
-| `/delhome <名前>` | 特定のホームを削除します。 | `homes.use` |
-| `/home <名前>` | 特定のホームにテレポートします。 | `homes.use` |
-| `/homes` | ホーム管理 GUI を開きます。 | `homes.use` |
+| `/sethome <名前>` | 現在地をホームとして設定します。 | — |
+| `/delhome <名前>` | 特定のホームを削除します。 | — |
+| `/home <名前>` | 特定のホームにテレポートします。 | — |
+| `/homes` | ホーム管理 GUI を開きます。 | — |
 | `/homes reload` | プラグインの設定を再読み込みします。 | `homes.reload` |
-| `/vhome <プレイヤー>` | 他のプレイヤーの公開ホームリストを開きます。 | `homes.use` |
-| `/tpa <プレイヤー>` | 相手に自分のテレポートリクエストを送ります（相手の場所へ行く）。 | `homes.use` |
-| `/tpahere <プレイヤー>` | 相手を自分の場所に呼ぶリクエストを送ります（カモン）。 | `homes.use` |
-| `/tpaccept` | 届いているリクエストを承認します。 | `homes.use` |
-| `/tpdeny` | 届いているリクエストを拒否します。 | `homes.use` |
-| `/tpcancel <プレイヤー>` | 送ったリクエストをキャンセルします。 | `homes.use` |
-| `/tpatoggle` | TPAの受信拒否設定を切り替えます。 | `homes.use` |
-| `/tpaignore <プレイヤー>` | 特定のプレイヤーからのTPAを無視します。 | `homes.use` |
-| `/back` | 直前の場所（または死亡地点）に戻ります。 | `homes.use` |
+| `/vhome <プレイヤー>` | 他のプレイヤーの公開ホームリストを開きます。 | — |
+| `/tpa <プレイヤー>` | 相手に自分のテレポートリクエストを送ります（相手の場所へ行く）。 | — |
+| `/tpahere <プレイヤー>` | 相手を自分の場所に呼ぶリクエストを送ります（カモン）。 | — |
+| `/tpaccept` | 届いているリクエストを承認します。 | — |
+| `/tpdeny` | 届いているリクエストを拒否します。 | — |
+| `/tpcancel <プレイヤー>` | 送ったリクエストをキャンセルします。 | — |
+| `/tpatoggle` | TPAの受信拒否設定を切り替えます。 | — |
+| `/tpaignore <プレイヤー>` | 特定のプレイヤーからのTPAを無視します。 | — |
+| `/back` | 直前の場所（または死亡地点）に戻ります。 | — |
 
 ### ⚙️ 設定 (config.yml)
 

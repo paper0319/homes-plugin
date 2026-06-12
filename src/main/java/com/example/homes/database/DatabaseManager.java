@@ -12,8 +12,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
-import org.bukkit.Location;
-
 import com.example.homes.HomesPlugin;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -102,30 +100,6 @@ public class DatabaseManager {
         config.setConnectionTimeout(10000); // 10 seconds
 
         dataSource = new HikariDataSource(config);
-    }
-
-    public List<String> getPlayersWithPublicHomes() {
-        List<String> players = new ArrayList<>();
-        String sql = "SELECT DISTINCT player_uuid FROM player_homes WHERE is_public = true";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                String uuidStr = rs.getString("player_uuid");
-                try {
-                    UUID uuid = UUID.fromString(uuidStr);
-                    org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(uuid);
-                    if (op.getName() != null) {
-                        players.add(op.getName());
-                    }
-                } catch (IllegalArgumentException e) {
-                    // Ignore invalid UUIDs
-                }
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to load players with public homes", e);
-        }
-        return players;
     }
 
     public List<UUID> getPlayerUuidsWithPublicHomes() {
@@ -314,28 +288,6 @@ public class DatabaseManager {
         }
     }
 
-    public void setHome(UUID uuid, String name, Location loc, boolean isPublic) {
-        if (loc == null || loc.getWorld() == null) {
-            plugin.getLogger().severe("Failed to set home: location/world is null");
-            return;
-        }
-        setHome(
-                uuid,
-                name,
-                loc.getWorld().getName(),
-                loc.getX(),
-                loc.getY(),
-                loc.getZ(),
-                loc.getYaw(),
-                loc.getPitch(),
-                isPublic
-        );
-    }
-
-    public void setHome(UUID uuid, String name, Location loc) {
-        setHome(uuid, name, loc, false); // Default not public
-    }
-    
     public void updatePublic(UUID uuid, String name, boolean isPublic) {
         String sql = "UPDATE player_homes SET is_public = ? WHERE player_uuid = ? AND home_name = ?";
         try (Connection conn = dataSource.getConnection();
@@ -388,23 +340,6 @@ public class DatabaseManager {
         }
     }
     
-    public boolean isPublic(UUID uuid, String name) {
-        String sql = "SELECT is_public FROM player_homes WHERE player_uuid = ? AND home_name = ?";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, uuid.toString());
-            stmt.setString(2, name);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getBoolean("is_public");
-                }
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to read public status", e);
-        }
-        return false;
-    }
-
     public void deleteHome(UUID uuid, String name) {
         String sql = "DELETE FROM player_homes WHERE player_uuid = ? AND home_name = ?";
         
@@ -416,43 +351,6 @@ public class DatabaseManager {
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to delete home", e);
         }
-    }
-
-    public HomeData getHomeData(UUID uuid, String name) {
-        String sql = "SELECT world_name, x, y, z, yaw, pitch FROM player_homes WHERE player_uuid = ? AND home_name = ?";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, uuid.toString());
-            stmt.setString(2, name);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return new HomeData(
-                            rs.getString("world_name"),
-                            rs.getDouble("x"),
-                            rs.getDouble("y"),
-                            rs.getDouble("z"),
-                            rs.getFloat("yaw"),
-                            rs.getFloat("pitch")
-                    );
-                }
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to get home", e);
-        }
-        return null;
-    }
-
-    public Location getHome(UUID uuid, String name) {
-        HomeData data = getHomeData(uuid, name);
-        if (data == null) return null;
-        return new Location(
-                plugin.getServer().getWorld(data.worldName),
-                data.x,
-                data.y,
-                data.z,
-                data.yaw,
-                data.pitch
-        );
     }
 
     public Map<String, Boolean> getHomePublicStatus(UUID uuid) {
@@ -536,22 +434,5 @@ public class DatabaseManager {
             plugin.getLogger().log(Level.SEVERE, "Failed to load homes", e);
         }
         return homes;
-    }
-
-    public Map<String, Location> getHomes(UUID uuid) {
-        Map<String, Location> out = new HashMap<>();
-        Map<String, HomeData> data = getHomesData(uuid);
-        for (Map.Entry<String, HomeData> e : data.entrySet()) {
-            HomeData d = e.getValue();
-            out.put(e.getKey(), new Location(
-                    plugin.getServer().getWorld(d.worldName),
-                    d.x,
-                    d.y,
-                    d.z,
-                    d.yaw,
-                    d.pitch
-            ));
-        }
-        return out;
     }
 }

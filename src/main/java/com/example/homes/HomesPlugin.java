@@ -119,10 +119,6 @@ public class HomesPlugin extends JavaPlugin {
         setTabCompleter("sethome", tabCompleter);
         setTabCompleter("delhome", tabCompleter);
         setTabCompleter("vhome", tabCompleter);
-        
-        // TPA Commands Tab Completer (Reusing HomeTabCompleter logic if simple, or create new)
-        // For now, TPA commands need player names. HomeTabCompleter already has some logic but we should extend it or just use it.
-        // We will update HomeTabCompleter to handle these new commands.
         setTabCompleter("tpa", tabCompleter);
         setTabCompleter("tpahere", tabCompleter);
         setTabCompleter("tpaccept", tabCompleter);

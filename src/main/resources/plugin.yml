@@ -1,10 +1,9 @@
 name: homes
-api: "1.21"
 version: ${project.version}
 main: com.example.homes.HomesPlugin
 api-version: 1.21
 author: naonao
-website: https://github.com/naonao0319/homes-plugin
+website: https://github.com/paper0319/homes-plugin
 commands:
   home:
     description: ホームにテレポートする
@@ -46,11 +45,11 @@ commands:
     description: 直前の場所に戻る
     usage: /back
 permissions:
-  homes.use:
-    description: 基本的なホーム機能の使用権限
-    default: true
   homes.admin:
     description: 他人のホームを閲覧・管理する権限
+    default: op
+  homes.reload:
+    description: /homes reload で設定を再読み込みする権限
     default: op
   # ホーム数の個別上限。LuckPerms 等で付与して使います:
   #   homes.limit.<数字>    例: homes.limit.10 で最大10個

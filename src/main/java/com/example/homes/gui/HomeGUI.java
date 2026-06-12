@@ -76,8 +76,7 @@ public class HomeGUI implements Listener {
             homeManager.ensureLoaded(target.getUniqueId()).thenRun(() -> plugin.getServer().getScheduler().runTask(plugin, () -> open(viewer, target)));
             return;
         }
-        // Floodgate check removed
-        
+
         boolean isOwner = viewer.getUniqueId().equals(target.getUniqueId());
         boolean isAdmin = viewer.hasPermission("homes.admin") && !isOwner;
         
@@ -143,25 +142,16 @@ public class HomeGUI implements Listener {
             if (createMeta != null) {
                 createMeta.displayName(colorize(plugin.getConfig().getString("gui.create-button.name", "&aホームを作成する")));
                 List<String> lore = new ArrayList<>(plugin.getConfig().getStringList("gui.create-button.lore"));
-                
-                // Show limit info
+
+                // 作成ボタンは isOwner のときだけ表示されるため、target は閲覧中の本人 (オンライン)
                 int current = homeManager.getHomes(target.getUniqueId()).size();
-                // Check max homes. OfflinePlayer might not work with permissions check easily if strictly permission based.
-                // But HomeManager.getMaxHomes takes Player. 
-                // If offline, we can't check permissions easily without vault or luckperms api.
-                // Assuming Owner is Online Player if we are here (open(Player, Player) calls this).
-                // Wait, if target is Offline, we can't cast to Player.
-                // But Create Home is only for Owner. Owner must be online to click.
-                // So if isOwner, target IS viewer, so target is Online.
                 int max;
                 if (target.isOnline()) {
                      max = homeManager.getMaxHomes((Player)target);
                 } else {
-                     // Fallback or specific logic for offline? Owner can't be offline and viewing.
-                     // So this branch is safe.
                      max = plugin.getConfig().getInt("settings.default-home-limit", 1);
                 }
-                
+
                 lore.add("&e現在の作成数: " + current + " / " + max);
                 
                 // Show cost
@@ -721,13 +711,8 @@ public class HomeGUI implements Listener {
         // Home Items (Slot 9-53)
         if (slot >= 9 && slot <= 53) {
             if (clickedItem.hasItemMeta() && clickedItem.getItemMeta().hasDisplayName()) {
-                
-                // Re-calculate mapping to find home
-                // We need to simulate the filling logic to map slot -> index
-                // Or easier: we know the homes are sorted and we know our start index
-                // But holes (buttons) make it tricky.
-                // Re-running the loop is safest.
-                
+
+                // 描画時と同じ並び・フィルタを再現してスロット→ホーム名を逆引きする
                 Map<String, Location> homesMap = homeManager.getHomes(target.getUniqueId());
                 List<String> visibleHomes = getVisibleHomes(viewer, target, homesMap);
                 String query = sessionManager.getSearchQuery(viewer.getUniqueId());

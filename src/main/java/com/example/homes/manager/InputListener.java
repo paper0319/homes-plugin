@@ -303,8 +303,4 @@ public class InputListener implements Listener {
             homeGUI.open(player);
         }
     }
-
-    public void clearPlayerState(UUID uuid) {
-        sessionManager.cleanup(uuid);
-    }
 }

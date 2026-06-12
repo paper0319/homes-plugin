@@ -21,11 +21,8 @@ import net.kyori.adventure.text.event.HoverEvent;
 public class TpaManager {
 
     private final HomesPlugin plugin;
-    
-    // Request: Receiver UUID -> Sender UUID (One pending request at a time per player)
-    // Or better: Map<Receiver, Map<Sender, RequestType>> but simple TPA usually allows one or stack.
-    // Let's allow multiple requests but separate them by sender.
-    // Map<ReceiverUUID, Map<SenderUUID, RequestType>>
+
+    // 受信者UUID -> (送信者UUID -> リクエスト)。複数人からの同時リクエストを保持する。
     private final Map<UUID, Map<UUID, TpaRequest>> requests = new HashMap<>();
     
     // Last Locations for /back: UUID -> Location
@@ -78,10 +75,6 @@ public class TpaManager {
             sender.sendMessage(plugin.getMessage("tpa-ignored").replace("{player}", receiver.getName()));
             return;
         }
-
-        // Auto accept check (if implemented, user said /tpauto exists)
-        // If receiver has auto-accept enabled... (Not storing this yet, assume command logic handles or add field)
-        // For now standard request flow.
 
         requests.computeIfAbsent(receiver.getUniqueId(), k -> new HashMap<>()).put(sender.getUniqueId(), new TpaRequest(sender.getUniqueId(), type));
 

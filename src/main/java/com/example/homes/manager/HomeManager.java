@@ -357,11 +357,7 @@ public class HomeManager {
         }
     }
     
-    // Get list of names of players who have at least one public home (or any home? vhome checks public anyway)
-    // To be efficient, this should probably come from DB query or cache.
-    // For now, let's just return online players + cached offline players?
-    // Or query DB for "SELECT DISTINCT uuid FROM homes WHERE is_public = true"
-    // Let's implement a method in DatabaseManager to get players with public homes.
+    /** 公開ホームを1つ以上持つプレイヤー名の一覧 (タブ補完用、非同期更新のキャッシュ)。 */
     public List<String> getPlayersWithPublicHomes() {
         if (cachedPlayersWithPublicHomes.isEmpty()) {
             refreshPlayersWithPublicHomes();
