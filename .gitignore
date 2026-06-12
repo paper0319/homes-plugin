@@ -22,3 +22,7 @@ Thumbs.db
 server/
 dependency-reduced-pom.xml
 .claude/
+
+# Local-only docs
+docs/
+CLAUDE.md
