@@ -12,6 +12,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import com.example.homes.HomesPlugin;
+import com.example.homes.util.VanishUtil;
 
 public class HomeTabCompleter implements TabCompleter {
 
@@ -71,9 +72,10 @@ public class HomeTabCompleter implements TabCompleter {
                 }
                 for (Player p : player.getServer().getOnlinePlayers()) {
                     // Exclude self from TPA completion
-                    if (!p.getUniqueId().equals(player.getUniqueId())) {
-                        completions.add(p.getName());
-                    }
+                    if (p.getUniqueId().equals(player.getUniqueId())) continue;
+                    // vanish 中の相手は補完候補に出さない (透視権限保持者には表示)
+                    if (VanishUtil.isHiddenFrom(player, p)) continue;
+                    completions.add(p.getName());
                 }
                 // Do NOT include offline players for TPA
             }

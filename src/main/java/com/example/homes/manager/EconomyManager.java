@@ -61,6 +61,8 @@ public class EconomyManager {
      */
     public boolean charge(Player player, String costKey) {
         if (!hasEconomy()) return true;
+        // homes.bypass.economy 保持者 (既定で OP) は利用料金が無料
+        if (player.hasPermission("homes.bypass.economy")) return true;
         double cost = plugin.getConfig().getDouble("economy.cost." + costKey, 0);
         if (cost <= 0) return true;
         if (!hasMoney(player, cost)) {

@@ -19,6 +19,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.holder.TpaGuiHolder;
+import com.example.homes.util.VanishUtil;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -57,9 +58,10 @@ public class TpaGUI implements Listener {
     private void render(Player viewer, int page) {
         List<Player> others = new ArrayList<>();
         for (Player p : Bukkit.getOnlinePlayers()) {
-            if (!p.getUniqueId().equals(viewer.getUniqueId())) {
-                others.add(p);
-            }
+            if (p.getUniqueId().equals(viewer.getUniqueId())) continue;
+            // vanish 中の相手は一覧に出さない (透視権限保持者には表示)
+            if (VanishUtil.isHiddenFrom(viewer, p)) continue;
+            others.add(p);
         }
         others.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
 
@@ -218,7 +220,8 @@ public class TpaGUI implements Listener {
 
         UUID targetUuid = holder.getHeads().get(headIndex);
         Player target = Bukkit.getPlayer(targetUuid);
-        if (target == null) {
+        // クリック後に対象がオフライン/ vanish した場合は弾いて一覧を再描画する
+        if (target == null || VanishUtil.isHiddenFrom(viewer, target)) {
             viewer.sendMessage(plugin.msg("player-not-found"));
             render(viewer, holder.getPage());
             return;

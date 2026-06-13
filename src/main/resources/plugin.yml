@@ -64,4 +64,16 @@ permissions:
   homes.limit.*:
     description: ホーム数を無制限にする (homes.limit.unlimited と同等)
     default: false
+  # テレポート/経済の bypass。既定で OP が保持し、LuckPerms 等で付与・剥奪できます。
+  homes.bypass.teleportdelay:
+    description: テレポートの待機時間(ウォームアップ)を無視して即時テレポートする
+    default: op
+  homes.bypass.economy:
+    description: ホーム機能の利用料金を無料にする
+    default: op
+  # vanish (SuperVanish/PremiumVanish 等) 中のプレイヤーは TPA 一覧・補完・対象から除外されます。
+  # この権限を持つ者 (既定で OP) には vanish 中の相手も見え、TPA できます。
+  homes.tpa.seehidden:
+    description: vanish 中のプレイヤーも TPA の対象として見える
+    default: op
 

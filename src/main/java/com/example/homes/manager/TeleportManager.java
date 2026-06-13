@@ -63,7 +63,10 @@ public class TeleportManager {
         // 新しいテレポート試行が始まったら、以前の確認待ちは破棄する
         pendingUnsafe.remove(player.getUniqueId());
 
-        int delay = plugin.getConfig().getInt("settings.teleport.delay", 3);
+        // homes.bypass.teleportdelay 保持者 (既定で OP) はウォームアップなしで即テレポート
+        int delay = player.hasPermission("homes.bypass.teleportdelay")
+                ? 0
+                : plugin.getConfig().getInt("settings.teleport.delay", 3);
 
         if (delay <= 0) {
             // Save location right before actual teleport

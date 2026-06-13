@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
+import com.example.homes.util.VanishUtil;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -60,6 +61,13 @@ public class TpaManager {
     }
 
     public void sendRequest(Player sender, Player receiver, RequestType type) {
+        // vanish 中の相手は「いない」ものとして扱い、存在を悟られないようにする。
+        // (透視権限 homes.tpa.seehidden を持つ送信者は対象にできる)
+        if (VanishUtil.isHiddenFrom(sender, receiver)) {
+            sender.sendMessage(plugin.msg("player-not-found"));
+            return;
+        }
+
         // Cooldown check
         if (cooldowns.containsKey(sender.getUniqueId())) {
             long lastUse = cooldowns.get(sender.getUniqueId());

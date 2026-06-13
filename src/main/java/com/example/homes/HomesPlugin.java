@@ -69,6 +69,10 @@ public class HomesPlugin extends JavaPlugin {
         return tpaManager;
     }
 
+    public EconomyManager getEconomyManager() {
+        return economyManager;
+    }
+
     public LanguageManager getLanguageManager() {
         return languageManager;
     }

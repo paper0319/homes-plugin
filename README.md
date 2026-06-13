@@ -22,10 +22,13 @@ This plugin allows players to set multiple homes, manage them via a GUI, share t
     *   Supports `/tpa` (Teleport to player) and `/tpahere` (Teleport player to you).
     *   Interactive chat buttons for **[Accept]** and **[Deny]**.
     *   Features include cooldowns, warmup time (5s), and movement cancellation.
+    *   **Vanish-aware**: vanished players (SuperVanish / PremiumVanish / EssentialsX / CMI) are hidden from TPA lists, tab-completion, and cannot be targeted.
 *   **Back Command**:
     *   Return to your previous location or death point using `/back`.
 *   **Economy Support**:
     *   Integration with Vault to charge for setting homes, teleporting, etc.
+*   **Permission Bypass**:
+    *   OPs (or any group via LuckPerms) can bypass the teleport warmup and economy costs.
 *   **Fully Configurable**:
     *   All messages and settings can be customized in `config.yml`.
 
@@ -47,6 +50,20 @@ This plugin allows players to set multiple homes, manage them via a GUI, share t
 | `/tpatoggle` | Toggle receiving teleport requests. | — |
 | `/tpaignore <player>` | Ignore teleport requests from a specific player. | — |
 | `/back` | Teleport to your previous location or death point. | — |
+
+### 🔑 Permissions
+
+All of these are `default: op`, so OPs have them out of the box. Grant or revoke them per player/group with **LuckPerms** (e.g. `lp user <name> permission set homes.bypass.economy false`).
+
+| Permission | Description | Default |
+| --- | --- | --- |
+| `homes.admin` | View and manage other players' homes. | op |
+| `homes.reload` | Use `/homes reload`. | op |
+| `homes.limit.<number>` | Set a specific home limit (e.g. `homes.limit.10`). | false |
+| `homes.limit.unlimited` | Unlimited homes. | false |
+| `homes.bypass.teleportdelay` | Teleport instantly, skipping the warmup. | op |
+| `homes.bypass.economy` | Use home features for free (skip all costs). | op |
+| `homes.tpa.seehidden` | See and target vanished players in TPA. | op |
 
 ### ⚙️ Configuration
 
@@ -113,10 +130,13 @@ Developed by **naonao**.
     *   `/tpa` (相手の場所へ行く) と `/tpahere` (相手を呼ぶ) に対応。
     *   チャットの【承認】【拒否】ボタンで簡単操作。
     *   クールダウン設定、テレポート前の待機時間（5秒）、移動キャンセル機能付き。
+    *   **Vanish対応**: vanish中のプレイヤー (SuperVanish / PremiumVanish / EssentialsX / CMI) は TPA 一覧・タブ補完から除外され、対象にもできません。
 *   **Back機能**:
     *   `/back` でテレポート前の場所や死亡地点に戻ることが可能。
 *   **経済連携**:
     *   Vaultプラグインと連携し、ホーム設定やテレポートにコストを設定可能。
+*   **権限による Bypass**:
+    *   OP（または LuckPerms で任意のグループ）は、テレポート待機時間と利用料金をスキップできます。
 *   **完全な日本語対応**:
     *   メッセージは `config.yml` ですべてカスタマイズ可能。
 
@@ -138,6 +158,20 @@ Developed by **naonao**.
 | `/tpatoggle` | TPAの受信拒否設定を切り替えます。 | — |
 | `/tpaignore <プレイヤー>` | 特定のプレイヤーからのTPAを無視します。 | — |
 | `/back` | 直前の場所（または死亡地点）に戻ります。 | — |
+
+### 🔑 権限
+
+以下はすべて `default: op` で、OP は最初から保持します。**LuckPerms** 等でプレイヤー/グループごとに付与・剥奪できます（例: `lp user <名前> permission set homes.bypass.economy false`）。
+
+| 権限 | 説明 | 既定 |
+| --- | --- | --- |
+| `homes.admin` | 他人のホームを閲覧・管理する。 | op |
+| `homes.reload` | `/homes reload` を使う。 | op |
+| `homes.limit.<数字>` | ホーム上限を指定する（例: `homes.limit.10`）。 | false |
+| `homes.limit.unlimited` | ホーム数を無制限にする。 | false |
+| `homes.bypass.teleportdelay` | 待機時間（ウォームアップ）を無視して即テレポート。 | op |
+| `homes.bypass.economy` | ホーム機能を無料で使う（全コストをスキップ）。 | op |
+| `homes.tpa.seehidden` | vanish 中のプレイヤーも TPA で見え、対象にできる。 | op |
 
 ### ⚙️ 設定 (config.yml)
 
