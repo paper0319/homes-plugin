@@ -28,7 +28,10 @@ public class TpaManager {
     // Last Locations for /back: UUID -> Location
     private final Map<UUID, Location> lastLocations = new HashMap<>();
     
-    // TPA Toggle (Ignore list or global toggle)
+    // TPA の受信拒否トグルと個別 ignore リスト。
+    // いずれも「セッション限り」の状態で、永続化しない。ログアウト時に
+    // clearPlayerState() で破棄され、再ログインすると既定 (受信ON・ignore なし) に戻る。
+    // これは意図的な仕様。永続化が必要になったらここをストレージ層に載せ替える。
     private final Set<UUID> tpaDisabled = new HashSet<>();
     private final Map<UUID, Set<UUID>> ignoredPlayers = new HashMap<>();
     private final Map<UUID, Long> cooldowns = new HashMap<>();
@@ -114,25 +117,28 @@ public class TpaManager {
         }.runTaskLater(plugin, 20 * 60);
     }
 
-    public void acceptRequest(Player receiver) {
-        if (!requests.containsKey(receiver.getUniqueId()) || requests.get(receiver.getUniqueId()).isEmpty()) {
-            receiver.sendMessage(plugin.msg("tpa-no-request"));
-            return;
-        }
-
-        // Get the most recent request by sorting timestamps
-        Map<UUID, TpaRequest> pending = requests.get(receiver.getUniqueId());
+    /**
+     * 保留中リクエストのうち最も新しい (timestamp が最大の) ものを返す。空なら null。
+     * /tpaccept と /tpdeny が「同じ1件」を対象にできるよう、両者で共有する。
+     */
+    static TpaRequest mostRecentRequest(Map<UUID, TpaRequest> pending) {
         TpaRequest latest = null;
-        
         for (TpaRequest req : pending.values()) {
             if (latest == null || req.timestamp > latest.timestamp) {
                 latest = req;
             }
         }
-        
-        if (latest != null) {
-            acceptRequest(receiver, latest.sender);
+        return latest;
+    }
+
+    public void acceptRequest(Player receiver) {
+        Map<UUID, TpaRequest> pending = requests.get(receiver.getUniqueId());
+        TpaRequest latest = pending == null ? null : mostRecentRequest(pending);
+        if (latest == null) {
+            receiver.sendMessage(plugin.msg("tpa-no-request"));
+            return;
         }
+        acceptRequest(receiver, latest.sender);
     }
     
     public void acceptRequest(Player receiver, UUID senderUuid) {
@@ -165,15 +171,17 @@ public class TpaManager {
     }
 
     public void denyRequest(Player receiver) {
-        if (!requests.containsKey(receiver.getUniqueId()) || requests.get(receiver.getUniqueId()).isEmpty()) {
+        Map<UUID, TpaRequest> pending = requests.get(receiver.getUniqueId());
+        TpaRequest latest = pending == null ? null : mostRecentRequest(pending);
+        if (latest == null) {
             receiver.sendMessage(plugin.msg("tpa-no-request"));
             return;
         }
-        
-        // Deny all or one? Usually one.
-        UUID senderUuid = requests.get(receiver.getUniqueId()).keySet().iterator().next();
-        requests.get(receiver.getUniqueId()).remove(senderUuid);
-        
+
+        // accept と同じく「最も新しい1件」を対象にする (両者で対象選択を統一)。
+        UUID senderUuid = latest.sender;
+        pending.remove(senderUuid);
+
         receiver.sendMessage(plugin.msg("tpa-request-denied"));
         Player sender = Bukkit.getPlayer(senderUuid);
         if (sender != null) {
@@ -223,6 +231,7 @@ public class TpaManager {
         }
     }
 
+    /** TPA 受信の可否を切り替える。状態はセッション限り (ログアウトで既定=受信ON に戻る)。 */
     public void toggleTpa(Player player) {
         if (tpaDisabled.contains(player.getUniqueId())) {
             tpaDisabled.remove(player.getUniqueId());
@@ -233,9 +242,9 @@ public class TpaManager {
         }
     }
 
+    /** 指定プレイヤーの ignore を切り替える。ignore リストはセッション限り (ログアウトで消える)。 */
     public void ignorePlayer(Player player, String targetName) {
-        // Implementation for ignore list
-        Player target = Bukkit.getPlayer(targetName); // Or offline logic
+        Player target = Bukkit.getPlayer(targetName);
         if (target == null) return;
         
         ignoredPlayers.computeIfAbsent(player.getUniqueId(), k -> new HashSet<>());

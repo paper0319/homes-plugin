@@ -1,12 +1,46 @@
 package com.example.homes.manager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 class UpdateCheckerSemverTest {
+
+    @Test
+    void parsesFirstVersionNumberFromArray() {
+        String json = "[{\"version_number\":\"1.16.0\",\"name\":\"a\"},"
+                + "{\"version_number\":\"1.15.0\",\"name\":\"b\"}]";
+        assertEquals("1.16.0", UpdateChecker.parseLatestVersionNumber(json));
+    }
+
+    @Test
+    void parseToleratesWhitespaceAndExtraFields() {
+        String json = "[ { \"id\": \"x\", \"version_number\" : \"2.0.1\" } ]";
+        assertEquals("2.0.1", UpdateChecker.parseLatestVersionNumber(json));
+    }
+
+    @Test
+    void parseReturnsNullForEmptyArray() {
+        assertNull(UpdateChecker.parseLatestVersionNumber("[]"));
+    }
+
+    @Test
+    void parseReturnsNullWhenVersionNumberMissing() {
+        assertNull(UpdateChecker.parseLatestVersionNumber("[{\"name\":\"no-version\"}]"));
+    }
+
+    @Test
+    void parseReturnsNullForNonArrayJson() {
+        assertNull(UpdateChecker.parseLatestVersionNumber("{\"version_number\":\"1.0.0\"}"));
+    }
+
+    @Test
+    void parseReturnsNullForMalformedJson() {
+        assertNull(UpdateChecker.parseLatestVersionNumber("not json at all"));
+    }
 
     @Test
     void equalVersions() {

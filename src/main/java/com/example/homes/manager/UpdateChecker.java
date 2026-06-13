@@ -5,8 +5,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -15,6 +13,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.example.homes.HomesPlugin;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
@@ -31,10 +33,6 @@ public class UpdateChecker implements Listener {
             + "/version?loaders=%5B%22paper%22%5D";
     private static final String DOWNLOAD_PAGE_BASE =
             "https://modrinth.com/plugin/" + MODRINTH_PROJECT_ID + "/version/";
-
-    // Matches first occurrence of "version_number":"X.Y.Z" in the JSON response.
-    private static final Pattern VERSION_NUMBER_PATTERN =
-            Pattern.compile("\"version_number\"\\s*:\\s*\"([^\"]+)\"");
 
     private static final LegacyComponentSerializer LEGACY_AMPERSAND =
             LegacyComponentSerializer.legacyAmpersand();
@@ -62,7 +60,7 @@ public class UpdateChecker implements Listener {
                     .build();
             HttpRequest req = HttpRequest.newBuilder(URI.create(API_URL))
                     .timeout(Duration.ofSeconds(10))
-                    .header("User-Agent", "naonao0319/homes-plugin (" + currentVersion + ")")
+                    .header("User-Agent", "paper0319/homes-plugin (" + currentVersion + ")")
                     .header("Accept", "application/json")
                     .GET()
                     .build();
@@ -73,12 +71,11 @@ public class UpdateChecker implements Listener {
                 return;
             }
 
-            Matcher m = VERSION_NUMBER_PATTERN.matcher(resp.body());
-            if (!m.find()) {
+            String fetched = parseLatestVersionNumber(resp.body());
+            if (fetched == null) {
                 plugin.getLogger().info("Update check: no published version for this loader/game version");
                 return;
             }
-            String fetched = m.group(1);
 
             int cmp;
             try {
@@ -97,6 +94,32 @@ public class UpdateChecker implements Listener {
         } catch (Exception e) {
             plugin.getLogger().warning("Update check failed: " + e.getClass().getSimpleName()
                     + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Extract the {@code version_number} of the first element in Modrinth's
+     * version-list JSON response. The API returns matching versions newest-first,
+     * so the first element is the latest published version for our filter.
+     *
+     * @return the version string, or {@code null} if the body is not a non-empty
+     *         JSON array whose first element carries a {@code version_number}
+     *         (also returns {@code null} for malformed JSON rather than throwing).
+     */
+    static String parseLatestVersionNumber(String json) {
+        try {
+            JsonElement root = JsonParser.parseString(json);
+            if (!root.isJsonArray()) return null;
+            JsonArray versions = root.getAsJsonArray();
+            if (versions.isEmpty()) return null;
+            JsonElement first = versions.get(0);
+            if (!first.isJsonObject()) return null;
+            JsonObject obj = first.getAsJsonObject();
+            JsonElement versionNumber = obj.get("version_number");
+            if (versionNumber == null || versionNumber.isJsonNull()) return null;
+            return versionNumber.getAsString();
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
