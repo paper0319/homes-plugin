@@ -5,10 +5,10 @@ import org.bukkit.entity.Player;
 import com.example.homes.HomesPlugin;
 import com.example.homes.manager.TpaManager;
 
-/** /tpaccept・/tpdeny・/tpatoggle - 引数を取らない TPA 操作コマンド。 */
+/** /tpaccept・/tpdeny・/tpatoggle・/tpaauto - 引数を取らない TPA 操作コマンド。 */
 public class TpaResponseCommand extends PlayerCommandBase {
 
-    public enum Action { ACCEPT, DENY, TOGGLE }
+    public enum Action { ACCEPT, DENY, TOGGLE, AUTO }
 
     private final TpaManager tpaManager;
     private final Action action;
@@ -35,6 +35,7 @@ public class TpaResponseCommand extends PlayerCommandBase {
             case ACCEPT -> tpaManager.acceptRequest(player);
             case DENY -> tpaManager.denyRequest(player);
             case TOGGLE -> tpaManager.toggleTpa(player);
+            case AUTO -> tpaManager.toggleAutoAccept(player);
         }
         return true;
     }

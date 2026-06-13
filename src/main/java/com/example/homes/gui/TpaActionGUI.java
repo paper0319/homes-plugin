@@ -26,9 +26,10 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 public class TpaActionGUI implements Listener {
 
     private static final int GUI_SIZE = 27;
-    private static final int SLOT_TPAHERE = 11;
+    // 左に /TPA、右に /TPAHere を配置する (中央 13 はターゲットの頭)。
+    private static final int SLOT_TPA = 11;
     private static final int SLOT_HEAD = 13;
-    private static final int SLOT_TPA = 15;
+    private static final int SLOT_TPAHERE = 15;
     private static final int SLOT_BACK = 22;
 
     private static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.legacyAmpersand();

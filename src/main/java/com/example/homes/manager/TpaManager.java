@@ -28,11 +28,13 @@ public class TpaManager {
     // Last Locations for /back: UUID -> Location
     private final Map<UUID, Location> lastLocations = new HashMap<>();
     
-    // TPA の受信拒否トグルと個別 ignore リスト。
+    // TPA の受信拒否トグル・自動承認トグル・個別 ignore リスト。
     // いずれも「セッション限り」の状態で、永続化しない。ログアウト時に
-    // clearPlayerState() で破棄され、再ログインすると既定 (受信ON・ignore なし) に戻る。
-    // これは意図的な仕様。永続化が必要になったらここをストレージ層に載せ替える。
+    // clearPlayerState() で破棄され、再ログインすると既定 (受信ON・自動承認OFF・
+    // ignore なし) に戻る。これは意図的な仕様。永続化が必要になったらここを
+    // ストレージ層に載せ替える。
     private final Set<UUID> tpaDisabled = new HashSet<>();
+    private final Set<UUID> autoAccept = new HashSet<>();
     private final Map<UUID, Set<UUID>> ignoredPlayers = new HashMap<>();
     private final Map<UUID, Long> cooldowns = new HashMap<>();
 
@@ -84,8 +86,16 @@ public class TpaManager {
         // Update cooldown
         cooldowns.put(sender.getUniqueId(), System.currentTimeMillis());
 
+        // 受信側が自動承認 (/tpaauto) ON なら、保留にせず即座に承認する。
+        // /tpa は相手がこちらへ、/tpahere は自分が相手へ即 TP される。
+        if (autoAccept.contains(receiver.getUniqueId())) {
+            receiver.sendMessage(plugin.msg("tpa-auto-accepted", "player", sender.getName()));
+            acceptRequest(receiver, sender.getUniqueId());
+            return;
+        }
+
         sender.sendMessage(plugin.msg("tpa-sent", "player", receiver.getName()));
-        
+
         if (type == RequestType.TPAHERE) {
              receiver.sendMessage(plugin.msg("tpahere-received", "player", sender.getName()));
         } else {
@@ -242,6 +252,24 @@ public class TpaManager {
         }
     }
 
+    /**
+     * 届いた TPA / TPAHere リクエストを自動承認するかを切り替える。
+     * 状態はセッション限り (ログアウトで既定=自動承認OFF に戻る)。
+     */
+    public void toggleAutoAccept(Player player) {
+        if (autoAccept.contains(player.getUniqueId())) {
+            autoAccept.remove(player.getUniqueId());
+            player.sendMessage(plugin.msg("tpa-auto-off"));
+        } else {
+            autoAccept.add(player.getUniqueId());
+            player.sendMessage(plugin.msg("tpa-auto-on"));
+        }
+    }
+
+    public boolean isAutoAccept(UUID uuid) {
+        return autoAccept.contains(uuid);
+    }
+
     /** 指定プレイヤーの ignore を切り替える。ignore リストはセッション限り (ログアウトで消える)。 */
     public void ignorePlayer(Player player, String targetName) {
         Player target = Bukkit.getPlayer(targetName);
@@ -260,6 +288,7 @@ public class TpaManager {
     public void clearPlayerState(UUID uuid) {
         lastLocations.remove(uuid);
         tpaDisabled.remove(uuid);
+        autoAccept.remove(uuid);
         ignoredPlayers.remove(uuid);
         cooldowns.remove(uuid);
         requests.remove(uuid);

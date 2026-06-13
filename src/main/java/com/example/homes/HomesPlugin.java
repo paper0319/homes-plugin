@@ -147,13 +147,14 @@ public class HomesPlugin extends JavaPlugin {
         setExecutor("tpaccept", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.ACCEPT));
         setExecutor("tpdeny", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.DENY));
         setExecutor("tpatoggle", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.TOGGLE));
+        setExecutor("tpaauto", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.AUTO));
         setExecutor("tpcancel", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.CANCEL));
         setExecutor("tpaignore", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.IGNORE));
         setExecutor("back", new BackCommand(this, tpaManager));
 
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
-                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpaignore", "tpatoggle", "back"}) {
+                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpaignore", "tpatoggle", "tpaauto", "back"}) {
             setTabCompleter(name, tabCompleter);
         }
     }

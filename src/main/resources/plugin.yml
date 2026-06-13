@@ -38,6 +38,9 @@ commands:
   tpatoggle:
     description: テレポートリクエストの受信設定を切り替える
     usage: /tpatoggle
+  tpaauto:
+    description: テレポートリクエストの自動承認を切り替える
+    usage: /tpaauto
   tpaignore:
     description: 特定のプレイヤーからのリクエストを無視する
     usage: /tpaignore <プレイヤー名>
