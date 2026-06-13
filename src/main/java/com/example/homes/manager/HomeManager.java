@@ -16,16 +16,16 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
-import com.example.homes.database.DatabaseManager;
+import com.example.homes.database.HomeData;
+import com.example.homes.database.HomeRepository;
 
 public class HomeManager {
 
     private final HomesPlugin plugin;
-    private DatabaseManager databaseManager;
-    
+    private final HomeRepository repository;
+
     private static final class HomeRecord {
         private Location location;
         private boolean isPublic;
@@ -46,19 +46,33 @@ public class HomeManager {
     private volatile List<String> cachedPlayersWithPublicHomes = Collections.emptyList();
     private volatile Map<String, UUID> cachedPublicHomeNameToUuid = Collections.emptyMap();
 
-    public HomeManager(HomesPlugin plugin) {
+    public HomeManager(HomesPlugin plugin, HomeRepository repository) {
         this.plugin = plugin;
-        setup();
-    }
-
-    private void setup() {
-        this.databaseManager = new DatabaseManager(plugin);
+        this.repository = repository;
     }
 
     public void close() {
-        if (databaseManager != null) {
-            databaseManager.close();
-        }
+        repository.close();
+    }
+
+    /**
+     * DB への書き込みを非同期で実行する。失敗したらログに残し、
+     * 操作したプレイヤーがオンラインなら保存失敗を通知する。
+     */
+    private void runWriteAsync(UUID actorUuid, String description, Runnable write) {
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                write.run();
+            } catch (RuntimeException e) {
+                plugin.getLogger().log(Level.SEVERE, "DB write failed: " + description, e);
+                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    Player actor = plugin.getServer().getPlayer(actorUuid);
+                    if (actor != null) {
+                        actor.sendMessage(plugin.msg("save-failed"));
+                    }
+                });
+            }
+        });
     }
 
     public boolean isLoaded(UUID uuid) {
@@ -76,50 +90,47 @@ public class HomeManager {
         return loading.computeIfAbsent(uuid, id -> {
             CompletableFuture<Void> future = new CompletableFuture<>();
             loaded.remove(id);
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    try {
-                        Map<String, com.example.homes.database.DatabaseManager.HomeData> homeData = databaseManager.getHomesData(id);
-                        Map<String, Boolean> publicStatus = databaseManager.getHomePublicStatus(id);
-                        Map<String, Boolean> favoriteStatus = databaseManager.getHomeFavoriteStatus(id);
-                        Map<String, String> memos = databaseManager.getHomeMemos(id);
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    Map<String, HomeData> homeData = repository.getHomesData(id);
+                    Map<String, Boolean> publicStatus = repository.getHomePublicStatus(id);
+                    Map<String, Boolean> favoriteStatus = repository.getHomeFavoriteStatus(id);
+                    Map<String, String> memos = repository.getHomeMemos(id);
 
-                        plugin.getServer().getScheduler().runTask(plugin, () -> {
-                            Map<String, HomeRecord> homes = new ConcurrentHashMap<>();
-                            for (Map.Entry<String, com.example.homes.database.DatabaseManager.HomeData> e : homeData.entrySet()) {
-                                com.example.homes.database.DatabaseManager.HomeData d = e.getValue();
-                                World world = plugin.getServer().getWorld(d.worldName);
-                                if (world == null) {
-                                    plugin.getLogger().log(
-                                            Level.WARNING,
-                                            "World ''{0}'' not found for home ''{1}'' of player {2}",
-                                            new Object[] { d.worldName, e.getKey(), id }
-                                    );
-                                    continue;
-                                }
-
-                                String homeName = e.getKey();
-                                boolean isPublic = Boolean.TRUE.equals(publicStatus.get(homeName));
-                                boolean isFavorite = Boolean.TRUE.equals(favoriteStatus.get(homeName));
-                                String memo = memos.get(homeName);
-                                Location loc = new Location(world, d.x, d.y, d.z, d.yaw, d.pitch);
-                                homes.put(homeName, new HomeRecord(loc, isPublic, isFavorite, memo));
+                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                        Map<String, HomeRecord> homes = new ConcurrentHashMap<>();
+                        for (Map.Entry<String, HomeData> e : homeData.entrySet()) {
+                            HomeData d = e.getValue();
+                            World world = plugin.getServer().getWorld(d.worldName());
+                            if (world == null) {
+                                plugin.getLogger().log(
+                                        Level.WARNING,
+                                        "World ''{0}'' not found for home ''{1}'' of player {2}",
+                                        new Object[] { d.worldName(), e.getKey(), id }
+                                );
+                                continue;
                             }
 
-                            cache.put(id, homes);
-                            loaded.add(id);
-                            loading.remove(id);
-                            future.complete(null);
-                        });
-                    } catch (RuntimeException e) {
-                        plugin.getServer().getScheduler().runTask(plugin, () -> {
-                            loading.remove(id);
-                            future.completeExceptionally(e);
-                        });
-                    }
+                            String homeName = e.getKey();
+                            boolean isPublic = Boolean.TRUE.equals(publicStatus.get(homeName));
+                            boolean isFavorite = Boolean.TRUE.equals(favoriteStatus.get(homeName));
+                            String memo = memos.get(homeName);
+                            Location loc = new Location(world, d.x(), d.y(), d.z(), d.yaw(), d.pitch());
+                            homes.put(homeName, new HomeRecord(loc, isPublic, isFavorite, memo));
+                        }
+
+                        cache.put(id, homes);
+                        loaded.add(id);
+                        loading.remove(id);
+                        future.complete(null);
+                    });
+                } catch (RuntimeException e) {
+                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                        loading.remove(id);
+                        future.completeExceptionally(e);
+                    });
                 }
-            }.runTaskAsynchronously(plugin);
+            });
             return future;
         });
     }
@@ -130,12 +141,11 @@ public class HomeManager {
         loaded.remove(uuid);
         loading.remove(uuid);
     }
-    
-    // Async set home
+
     public void setHome(Player player, String name, Location loc) {
         setHomeDirectly(player.getUniqueId(), name, loc);
     }
-    
+
     public void setHomeDirectly(UUID uuid, String name, Location loc) {
         if (loc == null || loc.getWorld() == null) {
             plugin.getLogger().warning("Failed to set home: location/world is null");
@@ -146,7 +156,7 @@ public class HomeManager {
             v.location = loc;
             return v;
         });
-        
+
         String worldName = loc.getWorld().getName();
         double x = loc.getX();
         double y = loc.getY();
@@ -154,29 +164,20 @@ public class HomeManager {
         float yaw = loc.getYaw();
         float pitch = loc.getPitch();
 
-        // Save to DB asynchronously
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                databaseManager.setHome(uuid, name, worldName, x, y, z, yaw, pitch, false); // Default false
-            }
-        }.runTaskAsynchronously(plugin);
+        runWriteAsync(uuid, "setHome " + name,
+                () -> repository.setHome(uuid, name, worldName, x, y, z, yaw, pitch, false));
     }
-    
+
     public void setPublic(UUID uuid, String name, boolean isPublic) {
         cache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).compute(name, (k, v) -> {
             if (v == null) return new HomeRecord(null, isPublic, false, null);
             v.isPublic = isPublic;
             return v;
         });
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                databaseManager.updatePublic(uuid, name, isPublic);
-            }
-        }.runTaskAsynchronously(plugin);
+        runWriteAsync(uuid, "updatePublic " + name,
+                () -> repository.updatePublic(uuid, name, isPublic));
     }
-    
+
     public void renameHome(UUID uuid, String oldName, String newName) {
         Map<String, HomeRecord> homes = cache.get(uuid);
         if (homes != null) {
@@ -185,16 +186,10 @@ public class HomeManager {
                 homes.put(newName, rec);
             }
         }
-        
-        // Update DB
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                databaseManager.renameHome(uuid, oldName, newName);
-            }
-        }.runTaskAsynchronously(plugin);
+        runWriteAsync(uuid, "renameHome " + oldName + " -> " + newName,
+                () -> repository.renameHome(uuid, oldName, newName));
     }
-    
+
     public boolean isPublic(UUID uuid, String name) {
         Map<String, HomeRecord> homes = cache.get(uuid);
         if (homes == null) return false;
@@ -215,12 +210,8 @@ public class HomeManager {
             v.isFavorite = isFavorite;
             return v;
         });
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                databaseManager.updateFavorite(uuid, name, isFavorite);
-            }
-        }.runTaskAsynchronously(plugin);
+        runWriteAsync(uuid, "updateFavorite " + name,
+                () -> repository.updateFavorite(uuid, name, isFavorite));
     }
 
     public String getMemo(UUID uuid, String name) {
@@ -236,29 +227,17 @@ public class HomeManager {
             v.memo = memo;
             return v;
         });
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                databaseManager.updateMemo(uuid, name, memo);
-            }
-        }.runTaskAsynchronously(plugin);
+        runWriteAsync(uuid, "updateMemo " + name,
+                () -> repository.updateMemo(uuid, name, memo));
     }
-    
-    // Async delete home
+
     public void deleteHome(UUID uuid, String name) {
-        // Update cache immediately
         Map<String, HomeRecord> homes = cache.get(uuid);
         if (homes != null) {
             homes.remove(name);
         }
-        
-        // Delete from DB asynchronously
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                databaseManager.deleteHome(uuid, name);
-            }
-        }.runTaskAsynchronously(plugin);
+        runWriteAsync(uuid, "deleteHome " + name,
+                () -> repository.deleteHome(uuid, name));
     }
 
     public void deleteHome(Player player, String name) {
@@ -269,7 +248,7 @@ public class HomeManager {
     public Location getHome(Player player, String name) {
         return getHome(player.getUniqueId(), name);
     }
-    
+
     public Location getHome(UUID uuid, String name) {
         Map<String, HomeRecord> homes = cache.get(uuid);
         if (homes == null) return null;
@@ -281,7 +260,7 @@ public class HomeManager {
     public Map<String, Location> getHomes(Player player) {
         return getHomes(player.getUniqueId());
     }
-    
+
     public Map<String, Location> getHomes(UUID uuid) {
         Map<String, HomeRecord> homes = cache.get(uuid);
         if (homes == null || !loaded.contains(uuid)) return Collections.emptyMap();
@@ -346,7 +325,7 @@ public class HomeManager {
         int max = getMaxHomes(player);
         return current < max;
     }
-    
+
     // For reload command
     public void reload() {
         cache.clear();
@@ -356,7 +335,7 @@ public class HomeManager {
             loadHomes(p.getUniqueId());
         }
     }
-    
+
     /** 公開ホームを1つ以上持つプレイヤー名の一覧 (タブ補完用、非同期更新のキャッシュ)。 */
     public List<String> getPlayersWithPublicHomes() {
         if (cachedPlayersWithPublicHomes.isEmpty()) {
@@ -366,25 +345,22 @@ public class HomeManager {
     }
 
     public void refreshPlayersWithPublicHomes() {
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                List<UUID> uuids = databaseManager.getPlayerUuidsWithPublicHomes();
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
-                    List<String> players = new ArrayList<>();
-                    Map<String, UUID> nameToUuid = new HashMap<>();
-                    for (UUID uuid : uuids) {
-                        OfflinePlayer op = plugin.getServer().getOfflinePlayer(uuid);
-                        if (op.getName() != null) {
-                            players.add(op.getName());
-                            nameToUuid.put(op.getName().toLowerCase(), uuid);
-                        }
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            List<UUID> uuids = repository.getPlayerUuidsWithPublicHomes();
+            plugin.getServer().getScheduler().runTask(plugin, () -> {
+                List<String> players = new ArrayList<>();
+                Map<String, UUID> nameToUuid = new HashMap<>();
+                for (UUID uuid : uuids) {
+                    OfflinePlayer op = plugin.getServer().getOfflinePlayer(uuid);
+                    if (op.getName() != null) {
+                        players.add(op.getName());
+                        nameToUuid.put(op.getName().toLowerCase(), uuid);
                     }
-                    cachedPlayersWithPublicHomes = players;
-                    cachedPublicHomeNameToUuid = nameToUuid;
-                });
-            }
-        }.runTaskAsynchronously(plugin);
+                }
+                cachedPlayersWithPublicHomes = players;
+                cachedPublicHomeNameToUuid = nameToUuid;
+            });
+        });
     }
 
     // Resolve a player's UUID by name, robust to offline targets whose name is
@@ -397,7 +373,7 @@ public class HomeManager {
         if (cachedPublicHomeNameToUuid.isEmpty()) {
             // Block briefly on a refresh so first-use after restart works.
             try {
-                List<UUID> uuids = databaseManager.getPlayerUuidsWithPublicHomes();
+                List<UUID> uuids = repository.getPlayerUuidsWithPublicHomes();
                 Map<String, UUID> nameToUuid = new HashMap<>();
                 List<String> players = new ArrayList<>();
                 for (UUID uuid : uuids) {

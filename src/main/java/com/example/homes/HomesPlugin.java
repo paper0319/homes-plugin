@@ -15,6 +15,7 @@ import com.example.homes.command.TpaRequestCommand;
 import com.example.homes.command.TpaResponseCommand;
 import com.example.homes.command.TpaTargetCommand;
 import com.example.homes.command.VHomeCommand;
+import com.example.homes.database.DatabaseManager;
 import com.example.homes.gui.ConfirmGUI;
 import com.example.homes.gui.HomeGUI;
 import com.example.homes.gui.TpaActionGUI;
@@ -93,7 +94,7 @@ public class HomesPlugin extends JavaPlugin {
         this.sessionManager = new SessionManager();
         this.soundManager = new SoundManager(this);
         this.economyManager = new EconomyManager(this);
-        this.homeManager = new HomeManager(this);
+        this.homeManager = new HomeManager(this, new DatabaseManager(this));
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager);
         this.inputListener = new InputListener(this, homeManager, sessionManager, soundManager, economyManager);
         this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);

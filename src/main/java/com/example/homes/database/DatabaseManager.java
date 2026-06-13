@@ -16,29 +16,11 @@ import com.example.homes.HomesPlugin;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-public class DatabaseManager {
+public class DatabaseManager implements HomeRepository {
 
     private final HomesPlugin plugin;
     private HikariDataSource dataSource;
     private HikariConfig config;
-
-    public static final class HomeData {
-        public final String worldName;
-        public final double x;
-        public final double y;
-        public final double z;
-        public final float yaw;
-        public final float pitch;
-
-        public HomeData(String worldName, double x, double y, double z, float yaw, float pitch) {
-            this.worldName = worldName;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.yaw = yaw;
-            this.pitch = pitch;
-        }
-    }
 
     private interface MemoColumnDialect {
         String alterMemoColumnSql(int length);
@@ -68,11 +50,11 @@ public class DatabaseManager {
             String db = plugin.getConfig().getString("database.name", "minecraft");
             String user = plugin.getConfig().getString("database.user", "root");
             String pass = plugin.getConfig().getString("database.password", "");
-            
+
             config.setJdbcUrl("jdbc:" + type + "://" + host + ":" + port + "/" + db);
             config.setUsername(user);
             config.setPassword(pass);
-            
+
             // Optimization for MySQL/MariaDB
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
@@ -93,7 +75,7 @@ public class DatabaseManager {
 
         // Connection Pool Tuning
         config.setPoolName("HomesPlugin-Pool");
-        config.setMaximumPoolSize(10); // Adjust based on server load, 10 is usually enough for this plugin
+        config.setMaximumPoolSize(10);
         config.setMinimumIdle(2);
         config.setIdleTimeout(30000); // 30 seconds
         config.setMaxLifetime(1800000); // 30 minutes
@@ -102,6 +84,7 @@ public class DatabaseManager {
         dataSource = new HikariDataSource(config);
     }
 
+    @Override
     public List<UUID> getPlayerUuidsWithPublicHomes() {
         List<UUID> players = new ArrayList<>();
         String sql = "SELECT DISTINCT player_uuid FROM player_homes WHERE is_public = true";
@@ -113,6 +96,7 @@ public class DatabaseManager {
                 try {
                     players.add(UUID.fromString(uuidStr));
                 } catch (IllegalArgumentException e) {
+                    // 不正な UUID 行は無視
                 }
             }
         } catch (SQLException e) {
@@ -135,7 +119,7 @@ public class DatabaseManager {
                 "is_public BOOLEAN NOT NULL DEFAULT FALSE," +
                 "UNIQUE (player_uuid, home_name)" +
                 ");";
-        
+
         // Use createIndex for faster lookups
         String indexSql = "CREATE INDEX IF NOT EXISTS idx_player_uuid ON player_homes(player_uuid);";
 
@@ -246,12 +230,14 @@ public class DatabaseManager {
         }
     }
 
+    @Override
     public void close() {
         if (dataSource != null) {
             dataSource.close();
         }
     }
 
+    @Override
     public void setHome(UUID uuid, String name, String worldName, double x, double y, double z, float yaw, float pitch, boolean isPublic) {
         if (worldName == null || worldName.isBlank()) {
             plugin.getLogger().severe("Failed to set home: worldName is null/blank");
@@ -284,10 +270,11 @@ public class DatabaseManager {
 
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to set home", e);
+            throw new DataAccessException("Failed to set home", e);
         }
     }
 
+    @Override
     public void updatePublic(UUID uuid, String name, boolean isPublic) {
         String sql = "UPDATE player_homes SET is_public = ? WHERE player_uuid = ? AND home_name = ?";
         try (Connection conn = dataSource.getConnection();
@@ -297,10 +284,11 @@ public class DatabaseManager {
             stmt.setString(3, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to update public", e);
+            throw new DataAccessException("Failed to update public", e);
         }
     }
 
+    @Override
     public void updateFavorite(UUID uuid, String name, boolean isFavorite) {
         String sql = "UPDATE player_homes SET is_favorite = ? WHERE player_uuid = ? AND home_name = ?";
         try (Connection conn = dataSource.getConnection();
@@ -310,10 +298,11 @@ public class DatabaseManager {
             stmt.setString(3, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to update favorite", e);
+            throw new DataAccessException("Failed to update favorite", e);
         }
     }
 
+    @Override
     public void updateMemo(UUID uuid, String name, String memo) {
         String sql = "UPDATE player_homes SET memo = ? WHERE player_uuid = ? AND home_name = ?";
         try (Connection conn = dataSource.getConnection();
@@ -323,10 +312,11 @@ public class DatabaseManager {
             stmt.setString(3, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to update memo", e);
+            throw new DataAccessException("Failed to update memo", e);
         }
     }
 
+    @Override
     public void renameHome(UUID uuid, String oldName, String newName) {
         String sql = "UPDATE player_homes SET home_name = ? WHERE player_uuid = ? AND home_name = ?";
         try (Connection conn = dataSource.getConnection();
@@ -336,31 +326,33 @@ public class DatabaseManager {
             stmt.setString(3, oldName);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to rename home", e);
+            throw new DataAccessException("Failed to rename home", e);
         }
     }
-    
+
+    @Override
     public void deleteHome(UUID uuid, String name) {
         String sql = "DELETE FROM player_homes WHERE player_uuid = ? AND home_name = ?";
-        
+
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, uuid.toString());
             stmt.setString(2, name);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Failed to delete home", e);
+            throw new DataAccessException("Failed to delete home", e);
         }
     }
 
+    @Override
     public Map<String, Boolean> getHomePublicStatus(UUID uuid) {
         Map<String, Boolean> status = new HashMap<>();
         String sql = "SELECT home_name, is_public FROM player_homes WHERE player_uuid = ?";
-        
+
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, uuid.toString());
-            
+
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     status.put(rs.getString("home_name"), rs.getBoolean("is_public"));
@@ -372,6 +364,7 @@ public class DatabaseManager {
         return status;
     }
 
+    @Override
     public Map<String, Boolean> getHomeFavoriteStatus(UUID uuid) {
         Map<String, Boolean> status = new HashMap<>();
         String sql = "SELECT home_name, is_favorite FROM player_homes WHERE player_uuid = ?";
@@ -390,6 +383,7 @@ public class DatabaseManager {
         return status;
     }
 
+    @Override
     public Map<String, String> getHomeMemos(UUID uuid) {
         Map<String, String> memos = new HashMap<>();
         String sql = "SELECT home_name, memo FROM player_homes WHERE player_uuid = ?";
@@ -411,6 +405,7 @@ public class DatabaseManager {
         return memos;
     }
 
+    @Override
     public Map<String, HomeData> getHomesData(UUID uuid) {
         Map<String, HomeData> homes = new HashMap<>();
         String sql = "SELECT home_name, world_name, x, y, z, yaw, pitch FROM player_homes WHERE player_uuid = ?";
