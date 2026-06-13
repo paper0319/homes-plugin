@@ -35,19 +35,31 @@ public class TeleportManager {
         this.tpaManager = tpaManager;
     }
 
+    /** テレポート完了時に送る既定の成功メッセージキー。 */
+    private static final String DEFAULT_SUCCESS_KEY = "teleport-success";
+
     public void teleport(Player player, Location target) {
-        teleport(player, (Object) target, false);
+        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY);
     }
 
     public void teleport(Player player, Location target, boolean allowWater) {
-        teleport(player, (Object) target, allowWater);
+        teleport(player, (Object) target, allowWater, DEFAULT_SUCCESS_KEY);
+    }
+
+    /**
+     * 場所へテレポートし、完了時に {@code successMessageKey} のメッセージを送る。
+     * ウォームアップがある場合でも、成功メッセージは実際にテレポートが
+     * 完了した時点でのみ送られる (開始時には teleport-start のみ)。
+     */
+    public void teleport(Player player, Location target, boolean allowWater, String successMessageKey) {
+        teleport(player, (Object) target, allowWater, successMessageKey);
     }
 
     public void teleport(Player player, Player target) {
-        teleport(player, (Object) target, false);
+        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY);
     }
 
-    private void teleport(Player player, Object target, boolean allowWater) {
+    private void teleport(Player player, Object target, boolean allowWater, String successMessageKey) {
         // 新しいテレポート試行が始まったら、以前の確認待ちは破棄する
         pendingUnsafe.remove(player.getUniqueId());
 
@@ -57,7 +69,7 @@ public class TeleportManager {
             // Save location right before actual teleport
             saveLocationBeforeTeleport(player);
             if (doTeleport(player, target, allowWater)) {
-                player.sendMessage(plugin.msg("teleport-success"));
+                player.sendMessage(plugin.msg(successMessageKey));
                 soundManager.play(player, "teleport-success");
             }
             return;
@@ -89,7 +101,7 @@ public class TeleportManager {
                     // Save location right before actual teleport (not during countdown)
                     saveLocationBeforeTeleport(player);
                     if (doTeleport(player, target, allowWater)) {
-                        player.sendMessage(plugin.msg("teleport-success"));
+                        player.sendMessage(plugin.msg(successMessageKey));
                         soundManager.play(player, "teleport-success");
                     }
                     this.cancel();

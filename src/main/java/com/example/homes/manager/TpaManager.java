@@ -233,9 +233,10 @@ public class TpaManager {
             // TeleportManager calls tpaManager.saveLastLocation() internally, which updates lastLocations with current pos.
             // This effectively creates a "swap" behavior for /back, which is desired.
             // No infinite loop risk because TeleportManager just calls saveLastLocation (put into map), not teleportBack recursively.
-            
-            plugin.getTeleportManager().teleport(player, loc, true);
-            player.sendMessage(plugin.msg("back-success"));
+            //
+            // back-success はテレポート完了時に出してもらう (ウォームアップ前に
+            // 出すと「戻りました」が先に表示され、実際の移動はその後になってしまう)。
+            plugin.getTeleportManager().teleport(player, loc, true, "back-success");
         } else {
             player.sendMessage(plugin.msg("back-no-location"));
         }
