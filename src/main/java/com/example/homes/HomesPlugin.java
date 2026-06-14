@@ -20,6 +20,7 @@ import com.example.homes.gui.ConfirmGUI;
 import com.example.homes.gui.HomeGUI;
 import com.example.homes.gui.TpaActionGUI;
 import com.example.homes.gui.TpaGUI;
+import com.example.homes.gui.UnsafeTeleportConfirmGUI;
 import com.example.homes.manager.DataListener;
 import com.example.homes.manager.DeathListener;
 import com.example.homes.manager.EconomyManager;
@@ -46,6 +47,7 @@ public class HomesPlugin extends JavaPlugin {
     private TeleportManager teleportManager;
     private HomeGUI homeGUI;
     private ConfirmGUI confirmGUI;
+    private UnsafeTeleportConfirmGUI unsafeTeleportConfirmGUI;
     private TpaGUI tpaGUI;
     private TpaActionGUI tpaActionGUI;
     private InputListener inputListener;
@@ -104,12 +106,14 @@ public class HomesPlugin extends JavaPlugin {
         this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);
         this.confirmGUI = new ConfirmGUI(this, homeManager, homeGUI, soundManager, sessionManager);
         this.homeGUI.setConfirmGUI(confirmGUI);
+        this.unsafeTeleportConfirmGUI = new UnsafeTeleportConfirmGUI(this, teleportManager, soundManager, economyManager);
+        this.teleportManager.setUnsafeConfirmGUI(unsafeTeleportConfirmGUI);
         this.tpaGUI = new TpaGUI(this);
         this.tpaActionGUI = new TpaActionGUI(this, tpaGUI);
         this.tpaGUI.setTpaActionGUI(tpaActionGUI);
         this.dataListener = new DataListener(homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
-        this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager, teleportManager);
+        this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager);
 
         // Link GUI and Input Listener
         this.homeGUI.setInputListener(inputListener);
@@ -117,6 +121,7 @@ public class HomesPlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(homeGUI, this);
         getServer().getPluginManager().registerEvents(confirmGUI, this);
+        getServer().getPluginManager().registerEvents(unsafeTeleportConfirmGUI, this);
         getServer().getPluginManager().registerEvents(inputListener, this);
         getServer().getPluginManager().registerEvents(dataListener, this);
         getServer().getPluginManager().registerEvents(deathListener, this);

@@ -78,4 +78,37 @@ class EconomyBypassTest {
         assertTrue(charged, "bypass なしでも残高があれば徴収成功");
         assertEquals(900, economy.getBalance(player), "費用 100 が引き落とされる");
     }
+
+    @Test
+    void refundDepositsTheChargedCostBack() {
+        PlayerMock player = server.addPlayer();
+        economy.setBalance(player, 1000);
+
+        plugin.getEconomyManager().charge(player, "teleport");
+        assertEquals(900, economy.getBalance(player), "徴収後は 100 減っている");
+
+        plugin.getEconomyManager().refund(player, "teleport");
+        assertEquals(1000, economy.getBalance(player), "払い戻しで費用 100 が戻る");
+    }
+
+    @Test
+    void refundWithBypassDoesNothing() {
+        PlayerMock player = server.addPlayer();
+        economy.setBalance(player, 1000);
+        player.addAttachment(plugin, BYPASS_ECONOMY, true);
+
+        plugin.getEconomyManager().refund(player, "teleport");
+
+        assertEquals(1000, economy.getBalance(player), "bypass は元々無料なので払い戻しも発生しない");
+    }
+
+    @Test
+    void refundWithNullKeyDoesNothing() {
+        PlayerMock player = server.addPlayer();
+        economy.setBalance(player, 1000);
+
+        plugin.getEconomyManager().refund(player, null);
+
+        assertEquals(1000, economy.getBalance(player), "費用キーが無い経路 (/back 等) では払い戻さない");
+    }
 }

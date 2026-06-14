@@ -1,9 +1,6 @@
 package com.example.homes.manager;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Location;
 import org.bukkit.Particle;
@@ -15,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
+import com.example.homes.gui.UnsafeTeleportConfirmGUI;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -26,8 +24,8 @@ public class TeleportManager {
     private final SoundManager soundManager;
     private final TpaManager tpaManager;
 
-    /** 危険な場所のため保留中の確認テレポート (プレイヤー → 元の目的地)。次のテレポート試行でクリアされる。 */
-    private final Map<UUID, Location> pendingUnsafe = new ConcurrentHashMap<>();
+    /** 危険な場所への確認テレポートをクリックで確定させる GUI。HomesPlugin の onEnable で注入される。 */
+    private UnsafeTeleportConfirmGUI unsafeConfirmGUI;
 
     public TeleportManager(HomesPlugin plugin, SoundManager soundManager, TpaManager tpaManager) {
         this.plugin = plugin;
@@ -35,15 +33,20 @@ public class TeleportManager {
         this.tpaManager = tpaManager;
     }
 
+    public void setUnsafeConfirmGUI(UnsafeTeleportConfirmGUI unsafeConfirmGUI) {
+        this.unsafeConfirmGUI = unsafeConfirmGUI;
+    }
+
     /** テレポート完了時に送る既定の成功メッセージキー。 */
     private static final String DEFAULT_SUCCESS_KEY = "teleport-success";
 
     public void teleport(Player player, Location target) {
-        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY);
+        // /home・GUI からのテレポートは "teleport" 費用を徴収済み。キャンセル時はこれを払い戻す。
+        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY, "teleport");
     }
 
     public void teleport(Player player, Location target, boolean allowWater) {
-        teleport(player, (Object) target, allowWater, DEFAULT_SUCCESS_KEY);
+        teleport(player, (Object) target, allowWater, DEFAULT_SUCCESS_KEY, null);
     }
 
     /**
@@ -52,29 +55,92 @@ public class TeleportManager {
      * 完了した時点でのみ送られる (開始時には teleport-start のみ)。
      */
     public void teleport(Player player, Location target, boolean allowWater, String successMessageKey) {
-        teleport(player, (Object) target, allowWater, successMessageKey);
+        // /back など費用を徴収しない経路。キャンセルしても払い戻しは無い。
+        teleport(player, (Object) target, allowWater, successMessageKey, null);
     }
 
     public void teleport(Player player, Player target) {
-        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY);
+        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY, null);
     }
 
-    private void teleport(Player player, Object target, boolean allowWater, String successMessageKey) {
-        // 新しいテレポート試行が始まったら、以前の確認待ちは破棄する
-        pendingUnsafe.remove(player.getUniqueId());
+    private void teleport(Player player, Object target, boolean allowWater, String successMessageKey, String refundCostKey) {
+        switch (target) {
+            case Location targetLocation -> {
+                // 危険判定はウォームアップより前に行う。安全地点が無ければ、
+                // カウントダウンを始める前に確認 GUI を開く (確認 → カウントダウンの順)。
+                Location safe = findSafeLocation(targetLocation, allowWater);
+                if (safe == null) {
+                    if (plugin.getConfig().getBoolean("settings.teleport.confirm-unsafe", true) && unsafeConfirmGUI != null) {
+                        soundManager.play(player, "teleport-fail");
+                        unsafeConfirmGUI.open(player, targetLocation.clone(), refundCostKey);
+                    } else {
+                        // 確認せず中止する設定。徴収済みなら払い戻す。
+                        player.sendMessage(plugin.msg("teleport-unsafe"));
+                        soundManager.play(player, "teleport-fail");
+                        plugin.getEconomyManager().refund(player, refundCostKey);
+                    }
+                    return;
+                }
+                startWarmup(player, () -> {
+                    saveLocationBeforeTeleport(player);
+                    player.teleport(safe);
+                    playTeleportEffect(player);
+                    player.sendMessage(plugin.msg(successMessageKey));
+                    soundManager.play(player, "teleport-success");
+                });
+            }
+            case Player targetPlayer -> startWarmup(player, () -> {
+                // 移動先プレイヤーの位置はテレポート確定時に読み直す (待機中に動く場合に追従)
+                if (!targetPlayer.isOnline()) {
+                    player.sendMessage(plugin.msg("teleport-target-not-found"));
+                    return;
+                }
+                saveLocationBeforeTeleport(player);
+                player.teleport(targetPlayer.getLocation());
+                playTeleportEffect(player);
+                player.sendMessage(plugin.msg(successMessageKey));
+                soundManager.play(player, "teleport-success");
+            });
+            default -> { }
+        }
+    }
 
-        // homes.bypass.teleportdelay 保持者 (既定で OP) はウォームアップなしで即テレポート
+    /**
+     * 確認 GUI で「はい」が選ばれたときに呼ばれる。安全地点の探索は行わず、
+     * ウォームアップ後にホームの正確な座標へそのままテレポートする。
+     */
+    public void teleportUnsafeConfirmed(Player player, Location target) {
+        if (target == null || target.getWorld() == null) {
+            player.sendMessage(plugin.msg("teleport-target-not-found"));
+            soundManager.play(player, "teleport-fail");
+            return;
+        }
+
+        Location exact = target.clone();
+        exact.setX(target.getBlockX() + 0.5);
+        exact.setZ(target.getBlockZ() + 0.5);
+        startWarmup(player, () -> {
+            // /back 用に直前の位置を保存してから、ブロック中央へテレポートする
+            saveLocationBeforeTeleport(player);
+            player.teleport(exact);
+            playTeleportEffect(player);
+            player.sendMessage(plugin.msg("teleport-success"));
+            soundManager.play(player, "teleport-success");
+        });
+    }
+
+    /**
+     * ウォームアップ (カウントダウン) を行い、完了したら {@code onComplete} を実行する共通処理。
+     * homes.bypass.teleportdelay 保持者 (既定で OP) は待ち時間なしで即実行する。
+     * 待機中に動くとキャンセルされる。
+     */
+    private void startWarmup(Player player, Runnable onComplete) {
         int delay = player.hasPermission("homes.bypass.teleportdelay")
                 ? 0
                 : plugin.getConfig().getInt("settings.teleport.delay", 3);
 
         if (delay <= 0) {
-            // Save location right before actual teleport
-            saveLocationBeforeTeleport(player);
-            if (doTeleport(player, target, allowWater)) {
-                player.sendMessage(plugin.msg(successMessageKey));
-                soundManager.play(player, "teleport-success");
-            }
+            onComplete.run();
             return;
         }
 
@@ -101,12 +167,7 @@ public class TeleportManager {
                 }
 
                 if (timeLeft <= 0) {
-                    // Save location right before actual teleport (not during countdown)
-                    saveLocationBeforeTeleport(player);
-                    if (doTeleport(player, target, allowWater)) {
-                        player.sendMessage(plugin.msg(successMessageKey));
-                        soundManager.play(player, "teleport-success");
-                    }
+                    onComplete.run();
                     this.cancel();
                 } else {
                     player.showTitle(Title.title(
@@ -121,80 +182,10 @@ public class TeleportManager {
         }.runTaskTimer(plugin, 0L, 20L);
     }
 
-    /** プレイヤーに確認待ちの危険テレポートがあるか。 */
-    public boolean hasPendingConfirm(UUID uuid) {
-        return pendingUnsafe.containsKey(uuid);
-    }
-
-    /** 確認待ちの危険テレポートを破棄する。 */
-    public void clearPendingConfirm(UUID uuid) {
-        pendingUnsafe.remove(uuid);
-    }
-
-    /**
-     * 確認待ちの危険テレポートを実行する。安全地点の探索は行わず、ホームの正確な座標へテレポートする。
-     * @return 保留がありテレポートを実行した場合 true
-     */
-    public boolean confirmPending(Player player) {
-        Location target = pendingUnsafe.remove(player.getUniqueId());
-        if (target == null) {
-            return false;
-        }
-        if (target.getWorld() == null) {
-            player.sendMessage(plugin.msg("teleport-target-not-found"));
-            soundManager.play(player, "teleport-fail");
-            return false;
-        }
-
-        // /back 用に直前の位置を保存してから、ブロック中央へテレポートする
-        saveLocationBeforeTeleport(player);
-        Location exact = target.clone();
-        exact.setX(target.getBlockX() + 0.5);
-        exact.setZ(target.getBlockZ() + 0.5);
-        player.teleport(exact);
-        playTeleportEffect(player);
-        player.sendMessage(plugin.msg("teleport-success"));
-        soundManager.play(player, "teleport-success");
-        return true;
-    }
-
     private void saveLocationBeforeTeleport(Player player) {
         if (tpaManager == null) return;
         if (!plugin.getConfig().getBoolean("settings.back.enabled", true)) return;
         tpaManager.saveLastLocation(player);
-    }
-    
-    private boolean doTeleport(Player player, Object target, boolean allowWater) {
-        return switch (target) {
-            case Player targetPlayer -> {
-                if (targetPlayer.isOnline()) {
-                    player.teleport(targetPlayer.getLocation());
-                    playTeleportEffect(player);
-                    yield true;
-                }
-                player.sendMessage(plugin.msg("teleport-target-not-found"));
-                yield false;
-            }
-            case Location targetLocation -> {
-                Location safe = findSafeLocation(targetLocation, allowWater);
-                if (safe == null) {
-                    if (plugin.getConfig().getBoolean("settings.teleport.confirm-unsafe", true)) {
-                        // 危険でも確認後にテレポートできるよう、目的地を保留する
-                        pendingUnsafe.put(player.getUniqueId(), targetLocation.clone());
-                        player.sendMessage(plugin.msg("teleport-unsafe-confirm"));
-                        soundManager.play(player, "teleport-fail");
-                    } else {
-                        player.sendMessage(plugin.msg("teleport-unsafe"));
-                        soundManager.play(player, "teleport-fail");
-                    }
-                    yield false;
-                }
-                player.teleport(safe);
-                playTeleportEffect(player);
-                yield true;
-            }
-            default -> false;
-        };
     }
 
     private void playTeleportEffect(Player player) {

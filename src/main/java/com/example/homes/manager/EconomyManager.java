@@ -48,6 +48,12 @@ public class EconomyManager {
         if (player == null) return;
         economy.withdrawPlayer(player, amount);
     }
+
+    public void deposit(OfflinePlayer player, double amount) {
+        if (!hasEconomy()) return;
+        if (player == null) return;
+        economy.depositPlayer(player, amount);
+    }
     
     public String format(double amount) {
         if (!hasEconomy()) return String.valueOf(amount);
@@ -72,5 +78,20 @@ public class EconomyManager {
         withdraw(player, cost);
         player.sendMessage(plugin.msg("payment-success", "cost", format(cost)));
         return true;
+    }
+
+    /**
+     * {@link #charge(Player, String)} で徴収した費用を払い戻す。
+     * 徴収条件 (経済有効・homes.bypass.economy なし・費用 &gt; 0) と対称で、
+     * 実際に徴収していないケース (無料) では何もしない。
+     */
+    public void refund(Player player, String costKey) {
+        if (costKey == null) return;
+        if (!hasEconomy()) return;
+        if (player.hasPermission("homes.bypass.economy")) return;
+        double cost = plugin.getConfig().getDouble("economy.cost." + costKey, 0);
+        if (cost <= 0) return;
+        deposit(player, cost);
+        player.sendMessage(plugin.msg("refund-success", "cost", format(cost)));
     }
 }

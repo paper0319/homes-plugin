@@ -44,17 +44,21 @@ class TpaManagerBackTest {
         return message.contains("戻りました") || message.toLowerCase().contains("returned");
     }
 
-    private static boolean isWarmupStart(String message) {
-        return message.contains("テレポートします") || message.toLowerCase().contains("teleporting in");
+    private static boolean isNoLocation(String message) {
+        return message.contains("戻る場所がありません") || message.toLowerCase().contains("no");
     }
 
     /**
-     * /back はウォームアップ (settings.teleport.delay > 0) のとき、テレポートが
-     * 完了する前に成功メッセージ (back-success) を出してはいけない。出すと
-     * 「死亡地点に戻りました」が先に表示され、実際の移動はその後、という矛盾になる。
+     * 保存された戻り先が無いときは、テレポートを試みず back-no-location を案内する。
+     *
+     * <p>戻り先がある場合のウォームアップ順序 (テレポート完了前に back-success を出さない) は、
+     * 全テレポートで共有される {@code TeleportManager.startWarmup} が保証しており、
+     * {@code TeleportBypassTest.withoutBypassTeleportStillWarmsUp} で検証している。
+     * 戻り先がある経路は安全判定 ({@code Block#isPassable}) を通るが、これは MockBukkit が
+     * 未実装のため、ここでは戻り先あり経路を直接検証できない。
      */
     @Test
-    void backSuccessIsNotSentBeforeWarmupCompletes() {
+    void backWithoutSavedLocationInformsPlayer() {
         plugin.getConfig().set("settings.teleport.delay", 3);
         plugin.getConfig().set("settings.back.enabled", true);
 
@@ -62,17 +66,15 @@ class TpaManagerBackTest {
         PlayerMock player = server.addPlayer();
         TpaManager tpaManager = plugin.getTpaManager();
 
-        tpaManager.saveLastLocation(player);
         drain(player); // join 等の既存メッセージを捨てる
 
+        // saveLastLocation を呼んでいない = 戻り先が無い
         tpaManager.teleportBack(player);
 
-        // スケジューラを進めない = ウォームアップは未完了。
-        List<String> synchronousMessages = drain(player);
-
-        assertTrue(synchronousMessages.stream().anyMatch(TpaManagerBackTest::isWarmupStart),
-                "ウォームアップ開始メッセージは即時に出るべき");
-        assertFalse(synchronousMessages.stream().anyMatch(TpaManagerBackTest::isBackSuccess),
-                "テレポート完了前に back-success を出してはいけない");
+        List<String> messages = drain(player);
+        assertTrue(messages.stream().anyMatch(TpaManagerBackTest::isNoLocation),
+                "戻り先が無いときは back-no-location を案内する");
+        assertFalse(messages.stream().anyMatch(TpaManagerBackTest::isBackSuccess),
+                "戻り先が無いのに back-success を出してはいけない");
     }
 }

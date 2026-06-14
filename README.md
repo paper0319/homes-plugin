@@ -81,7 +81,7 @@ settings:
 
   teleport:
     delay: 3             # Warmup in seconds (0 = instant)
-    confirm-unsafe: true # Dangerous home: true = ask & teleport when player types "confirm", false = cancel
+    confirm-unsafe: true # Dangerous home: true = ask via a confirmation GUI (click to teleport), false = cancel
     safe-search:         # Advanced: range used to find a safe landing spot
       radius: 2          # Horizontal radius (blocks)
       vertical: 3        # Vertical range (blocks)
@@ -187,7 +187,7 @@ settings:
 
   teleport:
     delay: 3             # テレポート待機秒数 (0で即時)
-    confirm-unsafe: true # 危険な場所: true=確認してチャットconfirmで強行, false=中止
+    confirm-unsafe: true # 危険な場所: true=確認GUIを開きクリックで強行, false=中止
     safe-search:         # 【上級者向け】安全な着地点の探索範囲
       radius: 2          # 水平方向の半径(ブロック)
       vertical: 3        # 上下方向の範囲(ブロック)
