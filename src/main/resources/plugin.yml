@@ -1,7 +1,7 @@
 name: homes
 version: ${project.version}
 main: com.example.homes.HomesPlugin
-api-version: "26.2"
+api-version: "1.21"
 author: paper
 website: https://github.com/paper0319/homes-plugin
 commands:

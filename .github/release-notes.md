@@ -1,9 +1,9 @@
-2.0.0
-## 🎉 新機能 / New Features
+2.0.1
+## Compatibility Fixes
 
-- `/setspawn` コマンドを追加しました。サーバーのスポーン地点を設定できます。
-- `/spawn` コマンドを追加しました。設定されたスポーン地点にテレポートできます。
+- Fixed plugin loading on Paper 1.21.11 by declaring the Bukkit API version as `1.21` instead of the unsupported `26.2` value.
+- Kept release metadata for Paper/Minecraft 26.x while compiling against the lowest supported API line for wider runtime compatibility.
 
-## ⚙️ 内部改善 / Internal Improvements
+## Build/Test
 
-- maven-shade-plugin を 3.6.2 にアップグレードし、Java 25 に対応しました。
+- Aligned the Paper API and MockBukkit test dependencies with the 1.21 compatibility baseline.
