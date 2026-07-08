@@ -37,7 +37,8 @@ class HomesPluginSmokeTest {
     @Test
     void commandsAreRegistered() {
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
-                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpatoggle", "tpaignore", "back"}) {
+                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpatoggle", "tpaignore", "back",
+                "spawn", "setspawn"}) {
             assertNotNull(plugin.getCommand(name), "command not registered: " + name);
         }
     }

@@ -1,8 +1,8 @@
 name: homes
 version: ${project.version}
 main: com.example.homes.HomesPlugin
-api-version: 1.21
-author: naonao
+api-version: "26.2"
+author: paper
 website: https://github.com/paper0319/homes-plugin
 commands:
   home:
@@ -47,6 +47,12 @@ commands:
   back:
     description: 直前の場所に戻る
     usage: /back
+  spawn:
+    description: スポーンへテレポートする
+    usage: /spawn
+  setspawn:
+    description: スポーン地点を設定する
+    usage: /setspawn
 permissions:
   homes.admin:
     description: 他人のホームを閲覧・管理する権限
@@ -76,4 +82,6 @@ permissions:
   homes.tpa.seehidden:
     description: vanish 中のプレイヤーも TPA の対象として見える
     default: op
-
+  homes.setspawn:
+    description: スポーン地点を設定できる
+    default: op

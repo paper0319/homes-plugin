@@ -29,7 +29,9 @@ import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.InputListener;
 import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
+import com.example.homes.manager.SpawnManager;
 import com.example.homes.manager.TeleportManager;
+import com.example.homes.manager.TpaManager;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -47,6 +49,8 @@ public class HomeGUI implements Listener {
     private static final int SLOT_SEARCH = 2;
     private static final int SLOT_FAVORITE = 3;
     private static final int SLOT_MEMO = 4;
+    private static final int SLOT_SPAWN = 5;
+    private static final int SLOT_BACK = 6;
     private static final int SLOT_PUBLIC = 7;
     private static final int SLOT_DELETE = 8;
     private static final int SLOT_PREV = 45;
@@ -59,17 +63,21 @@ public class HomeGUI implements Listener {
     private final TeleportManager teleportManager;
     private final SoundManager soundManager;
     private final EconomyManager economyManager;
+    private final SpawnManager spawnManager;
+    private final TpaManager tpaManager;
     private final SessionManager sessionManager;
     private InputListener inputListener;
     private ConfirmGUI confirmGUI;
 
-    public HomeGUI(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, TeleportManager teleportManager, SoundManager soundManager, EconomyManager economyManager) {
+    public HomeGUI(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, TeleportManager teleportManager, SoundManager soundManager, EconomyManager economyManager, SpawnManager spawnManager, TpaManager tpaManager) {
         this.plugin = plugin;
         this.homeManager = homeManager;
         this.sessionManager = sessionManager;
         this.teleportManager = teleportManager;
         this.soundManager = soundManager;
         this.economyManager = economyManager;
+        this.spawnManager = spawnManager;
+        this.tpaManager = tpaManager;
     }
 
     public void setInputListener(InputListener inputListener) {
@@ -168,6 +176,22 @@ public class HomeGUI implements Listener {
         }
 
         inv.setItem(SLOT_SEARCH, buildSearchButton(viewer));
+        if (plugin.getConfig().getBoolean("settings.spawn.enabled", true)) {
+            inv.setItem(SLOT_SPAWN, buildSimpleButton(
+                    Material.RECOVERY_COMPASS,
+                    "gui.spawn-button.name",
+                    "&aスポーン",
+                    "gui.spawn-button.lore",
+                    "&7クリックしてスポーンへ移動"));
+        }
+        if (isOwner && plugin.getConfig().getBoolean("settings.back.enabled", true)) {
+            inv.setItem(SLOT_BACK, buildSimpleButton(
+                    Material.ENDER_EYE,
+                    "gui.back-button.name",
+                    "&b戻る",
+                    "gui.back-button.lore",
+                    "&7クリックして直前の場所へ戻る"));
+        }
 
         if (isOwner || isAdmin) {
             inv.setItem(SLOT_DELETE, buildToggleButton(deleteMode,
@@ -254,6 +278,21 @@ public class HomeGUI implements Listener {
             searchItem.setItemMeta(searchMeta);
         }
         return searchItem;
+    }
+
+    private ItemStack buildSimpleButton(Material material, String nameKey, String defaultName, String loreKey, String defaultLore) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
+            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList(loreKey));
+            if (lore.isEmpty()) {
+                lore.add(defaultLore);
+            }
+            meta.lore(colorizeLore(lore));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     /** ON/OFF 2状態のモード切替ボタンを config (<keyBase>.name-on/off, lore-on/off) から組み立てる。 */
@@ -455,6 +494,22 @@ public class HomeGUI implements Listener {
             case SLOT_SEARCH -> {
                 if (inputListener != null) {
                     inputListener.startSearch(viewer);
+                }
+                return;
+            }
+            case SLOT_SPAWN -> {
+                if (spawnManager != null && plugin.getConfig().getBoolean("settings.spawn.enabled", true)) {
+                    viewer.closeInventory();
+                    soundManager.play(viewer, "gui-click");
+                    spawnManager.teleportToSpawn(viewer);
+                }
+                return;
+            }
+            case SLOT_BACK -> {
+                if (isOwner && tpaManager != null && plugin.getConfig().getBoolean("settings.back.enabled", true)) {
+                    viewer.closeInventory();
+                    soundManager.play(viewer, "gui-click");
+                    tpaManager.teleportBack(viewer);
                 }
                 return;
             }

@@ -11,6 +11,8 @@ import com.example.homes.command.DelHomeCommand;
 import com.example.homes.command.HomeCommand;
 import com.example.homes.command.HomesCommand;
 import com.example.homes.command.SetHomeCommand;
+import com.example.homes.command.SetSpawnCommand;
+import com.example.homes.command.SpawnCommand;
 import com.example.homes.command.TpaRequestCommand;
 import com.example.homes.command.TpaResponseCommand;
 import com.example.homes.command.TpaTargetCommand;
@@ -31,6 +33,7 @@ import com.example.homes.manager.LanguageManager;
 import com.example.homes.manager.SessionCleanupListener;
 import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
+import com.example.homes.manager.SpawnManager;
 import com.example.homes.manager.TeleportManager;
 import com.example.homes.manager.TpaManager;
 import com.example.homes.manager.UpdateChecker;
@@ -54,6 +57,7 @@ public class HomesPlugin extends JavaPlugin {
     private SoundManager soundManager;
     private EconomyManager economyManager;
     private TpaManager tpaManager;
+    private SpawnManager spawnManager;
     private DataListener dataListener;
     private DeathListener deathListener;
     private SessionCleanupListener sessionCleanupListener;
@@ -73,6 +77,10 @@ public class HomesPlugin extends JavaPlugin {
 
     public EconomyManager getEconomyManager() {
         return economyManager;
+    }
+
+    public SpawnManager getSpawnManager() {
+        return spawnManager;
     }
 
     public LanguageManager getLanguageManager() {
@@ -102,8 +110,9 @@ public class HomesPlugin extends JavaPlugin {
         this.economyManager = new EconomyManager(this);
         this.homeManager = new HomeManager(this, new DatabaseManager(this));
         this.teleportManager = new TeleportManager(this, soundManager, tpaManager);
+        this.spawnManager = new SpawnManager(this, teleportManager);
         this.inputListener = new InputListener(this, homeManager, sessionManager, soundManager, economyManager);
-        this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager);
+        this.homeGUI = new HomeGUI(this, homeManager, sessionManager, teleportManager, soundManager, economyManager, spawnManager, tpaManager);
         this.confirmGUI = new ConfirmGUI(this, homeManager, homeGUI, soundManager, sessionManager);
         this.homeGUI.setConfirmGUI(confirmGUI);
         this.unsafeTeleportConfirmGUI = new UnsafeTeleportConfirmGUI(this, teleportManager, soundManager, economyManager);
@@ -160,10 +169,13 @@ public class HomesPlugin extends JavaPlugin {
         setExecutor("tpcancel", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.CANCEL));
         setExecutor("tpaignore", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.IGNORE));
         setExecutor("back", new BackCommand(this, tpaManager));
+        setExecutor("spawn", new SpawnCommand(this, spawnManager));
+        setExecutor("setspawn", new SetSpawnCommand(this, spawnManager));
 
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
-                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpaignore", "tpatoggle", "tpaauto", "back"}) {
+                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpaignore", "tpatoggle", "tpaauto", "back",
+                "spawn", "setspawn"}) {
             setTabCompleter(name, tabCompleter);
         }
     }

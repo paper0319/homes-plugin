@@ -24,6 +24,9 @@ settings:
   teleport:
     # テレポートが実行されるまでの待機秒数 (0 にすると即時テレポート)
     delay: 3
+    bossbar:
+      enabled: true
+      color: GREEN
 
     # ホームが危険な場所(溶岩・空中など安全な足場が無い)だったときの動作:
     #   true  → 確認GUIを開き、「はい」をクリックすると強行テレポート
@@ -48,6 +51,9 @@ settings:
     enabled: true       # /back を使えるようにするか (テレポート前・死亡地点の保存も含む)
 
   # アップデート確認
+  spawn:
+    enabled: true
+
   update-check:
     enabled: true       # Modrinthで最新版を確認し、OPに通知するか
 
@@ -117,6 +123,14 @@ gui:
     lore:
       - "&7クリックして検索文字を入力"
       - "&7'clear' で解除"
+  spawn-button:
+    name: "&aスポーン"
+    lore:
+      - "&7クリックしてスポーンへ移動"
+  back-button:
+    name: "&b戻る"
+    lore:
+      - "&7クリックして直前の場所へ戻る"
   favorite-button:
     name-off: "&aお気に入りモード: OFF"
     name-on: "&eお気に入りモード: ON"

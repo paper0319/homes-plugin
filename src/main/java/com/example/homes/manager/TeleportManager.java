@@ -14,6 +14,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.UnsafeTeleportConfirmGUI;
 
+import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -146,7 +147,12 @@ public class TeleportManager {
 
         player.sendMessage(plugin.msg("teleport-start", "seconds", String.valueOf(delay)));
 
-        Location initialLoc = player.getLocation();
+        Location initialLoc = player.getLocation().clone();
+        BossBar bossBar = createWarmupBossBar(delay);
+        if (bossBar != null) {
+            player.showBossBar(bossBar);
+        }
+        displayWarmupTick(player, bossBar, delay, delay);
 
         new BukkitRunnable() {
             int timeLeft = delay;
@@ -154,32 +160,81 @@ public class TeleportManager {
             @Override
             public void run() {
                 if (!player.isOnline()) {
+                    hideBossBar(player, bossBar);
                     this.cancel();
                     return;
                 }
 
                 // Check movement
                 if (player.getLocation().distance(initialLoc) > 0.1) {
+                    hideBossBar(player, bossBar);
                     player.sendMessage(plugin.msg("teleport-cancelled"));
                     soundManager.play(player, "teleport-fail");
                     this.cancel();
                     return;
                 }
 
+                timeLeft--;
                 if (timeLeft <= 0) {
+                    hideBossBar(player, bossBar);
                     onComplete.run();
                     this.cancel();
                 } else {
-                    player.showTitle(Title.title(
-                            Component.text(String.valueOf(timeLeft), NamedTextColor.GREEN),
-                            Component.empty(),
-                            Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO)
-                    ));
-                    soundManager.play(player, "teleport-count");
-                    timeLeft--;
+                    displayWarmupTick(player, bossBar, timeLeft, delay);
                 }
             }
-        }.runTaskTimer(plugin, 0L, 20L);
+        }.runTaskTimer(plugin, 20L, 20L);
+    }
+
+    private BossBar createWarmupBossBar(int delay) {
+        if (!plugin.getConfig().getBoolean("settings.teleport.bossbar.enabled", true)) {
+            return null;
+        }
+
+        return BossBar.bossBar(
+                plugin.msg("teleport-bossbar", "seconds", String.valueOf(delay)),
+                1.0f,
+                bossBarColor(),
+                BossBar.Overlay.PROGRESS);
+    }
+
+    private void updateWarmupBossBar(BossBar bossBar, int timeLeft, int delay) {
+        if (bossBar == null) {
+            return;
+        }
+
+        float progress = Math.max(0.0f, Math.min(1.0f, (float) timeLeft / (float) delay));
+        bossBar.progress(progress);
+        bossBar.name(plugin.msg("teleport-bossbar", "seconds", String.valueOf(timeLeft)));
+    }
+
+    private void displayWarmupTick(Player player, BossBar bossBar, int timeLeft, int delay) {
+        updateWarmupBossBar(bossBar, timeLeft, delay);
+        player.showTitle(Title.title(
+                Component.text(String.valueOf(timeLeft), NamedTextColor.GREEN),
+                Component.empty(),
+                Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO)
+        ));
+        soundManager.play(player, "teleport-count");
+    }
+
+    private void hideBossBar(Player player, BossBar bossBar) {
+        if (bossBar != null) {
+            player.hideBossBar(bossBar);
+        }
+    }
+
+    private BossBar.Color bossBarColor() {
+        String raw = plugin.getConfig().getString("settings.teleport.bossbar.color", "GREEN");
+        if (raw == null) {
+            return BossBar.Color.GREEN;
+        }
+
+        try {
+            return BossBar.Color.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return BossBar.Color.GREEN;
+        }
     }
 
     private void saveLocationBeforeTeleport(Player player) {
