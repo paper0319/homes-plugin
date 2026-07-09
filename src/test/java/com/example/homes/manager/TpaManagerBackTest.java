@@ -1,11 +1,15 @@
 package com.example.homes.manager;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,5 +80,32 @@ class TpaManagerBackTest {
                 "戻り先が無いときは back-no-location を案内する");
         assertFalse(messages.stream().anyMatch(TpaManagerBackTest::isBackSuccess),
                 "戻り先が無いのに back-success を出してはいけない");
+    }
+
+    @Test
+    void cleanupPreservesSavedBackLocationForReconnect() {
+        plugin.getConfig().set("settings.teleport.delay", 0);
+        plugin.getConfig().set("settings.back.enabled", true);
+
+        World world = server.addSimpleWorld("world");
+        world.getBlockAt(0, 64, 0).setType(Material.STONE);
+        world.getBlockAt(20, 64, 20).setType(Material.STONE);
+
+        PlayerMock player = server.addPlayer();
+        TpaManager tpaManager = plugin.getTpaManager();
+
+        player.teleport(new Location(world, 0.5, 65.0, 0.5));
+        tpaManager.saveLastLocation(player);
+        player.teleport(new Location(world, 20.5, 65.0, 20.5));
+        tpaManager.clearPlayerState(player.getUniqueId());
+        drain(player);
+
+        tpaManager.teleportBack(player);
+
+        assertEquals(0.5, player.getLocation().getX(), 0.001);
+        assertEquals(65.0, player.getLocation().getY(), 0.001);
+        assertEquals(0.5, player.getLocation().getZ(), 0.001);
+        assertTrue(drain(player).stream().anyMatch(TpaManagerBackTest::isBackSuccess),
+                "reconnect cleanup should not discard the saved /back destination");
     }
 }

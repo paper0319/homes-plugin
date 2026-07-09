@@ -1,10 +1,14 @@
 package com.example.homes.manager;
 
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.HomeGUI;
@@ -22,6 +26,7 @@ public class InputListener implements Listener {
     private final EconomyManager economyManager;
     private HomeGUI homeGUI;
     private static final PlainTextComponentSerializer PLAIN_TEXT = PlainTextComponentSerializer.plainText();
+    private final Set<UUID> consumingInput = ConcurrentHashMap.newKeySet();
 
     public InputListener(HomesPlugin plugin, HomeManager homeManager, SessionManager sessionManager, SoundManager soundManager, EconomyManager economyManager) {
         this.plugin = plugin;
@@ -86,7 +91,7 @@ public class InputListener implements Listener {
         return sessionManager.isWaitingForInput(uuid);
     }
 
-    @EventHandler(priority = org.bukkit.event.EventPriority.LOWEST)
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
         String message = PLAIN_TEXT.serialize(event.originalMessage()).trim();
@@ -99,8 +104,38 @@ public class InputListener implements Listener {
         event.viewers().clear();
         event.message(Component.empty());
 
-        // チャットイベントは非同期で発火するため、メインスレッドで処理する
-        plugin.getServer().getScheduler().runTask(plugin, () -> handleChat(player, message));
+        scheduleInputHandling(player, message);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onLegacyChat(AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        String message = event.getMessage().trim();
+        UUID uuid = player.getUniqueId();
+        if (!isWaiting(uuid)) {
+            return;
+        }
+
+        event.setCancelled(true);
+        event.getRecipients().clear();
+        event.setMessage("");
+
+        scheduleInputHandling(player, message);
+    }
+
+    private void scheduleInputHandling(Player player, String message) {
+        UUID uuid = player.getUniqueId();
+        if (!consumingInput.add(uuid)) {
+            return;
+        }
+
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            try {
+                handleChat(player, message);
+            } finally {
+                consumingInput.remove(uuid);
+            }
+        });
     }
 
     private void handleChat(Player player, String message) {

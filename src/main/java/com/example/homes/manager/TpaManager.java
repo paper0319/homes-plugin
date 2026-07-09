@@ -295,7 +295,6 @@ public class TpaManager {
     }
     
     public void clearPlayerState(UUID uuid) {
-        lastLocations.remove(uuid);
         tpaDisabled.remove(uuid);
         autoAccept.remove(uuid);
         ignoredPlayers.remove(uuid);
