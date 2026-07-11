@@ -45,7 +45,7 @@ commands:
     description: 特定のプレイヤーからのリクエストを無視する
     usage: /tpaignore <プレイヤー名>
   back:
-    description: 直前の場所に戻る
+    description: 死亡地点に戻る
     usage: /back
   spawn:
     description: スポーンへテレポートする

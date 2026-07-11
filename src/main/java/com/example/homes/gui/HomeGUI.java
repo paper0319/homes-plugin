@@ -190,7 +190,7 @@ public class HomeGUI implements Listener {
                     "gui.back-button.name",
                     "&b戻る",
                     "gui.back-button.lore",
-                    "&7クリックして直前の場所へ戻る"));
+                    "&7クリックして死亡地点へ戻る"));
         }
 
         if (isOwner || isAdmin) {

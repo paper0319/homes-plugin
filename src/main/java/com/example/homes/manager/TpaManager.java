@@ -26,8 +26,8 @@ public class TpaManager {
     // 受信者UUID -> (送信者UUID -> リクエスト)。複数人からの同時リクエストを保持する。
     private final Map<UUID, Map<UUID, TpaRequest>> requests = new HashMap<>();
     
-    // Last Locations for /back: UUID -> Location
-    private final Map<UUID, Location> lastLocations = new HashMap<>();
+    // Death locations for /back: UUID -> Location
+    private final Map<UUID, Location> deathLocations = new HashMap<>();
     
     // TPA の受信拒否トグル・自動承認トグル・個別 ignore リスト。
     // いずれも「セッション限り」の状態で、永続化しない。ログアウト時に
@@ -165,13 +165,18 @@ public class TpaManager {
             return;
         }
 
-        TpaRequest req = requests.get(receiver.getUniqueId()).remove(senderUuid);
+        TpaRequest req = requests.get(receiver.getUniqueId()).get(senderUuid);
         Player sender = Bukkit.getPlayer(senderUuid);
 
         if (sender == null || !sender.isOnline()) {
             receiver.sendMessage(plugin.msg("player-not-found"));
             return;
         }
+
+        if (!plugin.getEconomyManager().charge(sender, "tpa")) {
+            return;
+        }
+        requests.get(receiver.getUniqueId()).remove(senderUuid);
 
         if (req.type == RequestType.TPA) {
             // Sender -> Receiver
@@ -222,28 +227,25 @@ public class TpaManager {
         }
     }
 
-    public void saveLastLocation(Player player) {
-        trySaveLastLocation(player);
-    }
-
-    public boolean trySaveLastLocation(Player player) {
+    public boolean saveDeathLocation(Player player) {
         if (!plugin.getConfig().getBoolean("settings.back.enabled", true)) {
             return false;
         }
-        lastLocations.put(player.getUniqueId(), player.getLocation());
+        deathLocations.put(player.getUniqueId(), player.getLocation().clone());
         return true;
     }
 
     public void teleportBack(Player player) {
-        if (lastLocations.containsKey(player.getUniqueId())) {
-            Location loc = lastLocations.get(player.getUniqueId());
+        if (deathLocations.containsKey(player.getUniqueId())) {
+            Location loc = deathLocations.get(player.getUniqueId());
             // Use TeleportManager for consistent behavior (sound, warmup if configured)
-            // TeleportManager calls tpaManager.saveLastLocation() internally, which updates lastLocations with current pos.
-            // This effectively creates a "swap" behavior for /back, which is desired.
-            // No infinite loop risk because TeleportManager just calls saveLastLocation (put into map), not teleportBack recursively.
+            // Only DeathListener stores this destination; normal teleports never change it.
             //
             // back-success はテレポート完了時に出してもらう (ウォームアップ前に
             // 出すと「戻りました」が先に表示され、実際の移動はその後になってしまう)。
+            if (!plugin.getEconomyManager().charge(player, "back")) {
+                return;
+            }
             plugin.getTeleportManager().teleport(player, loc, true, "back-success");
         } else {
             player.sendMessage(plugin.msg("back-no-location"));

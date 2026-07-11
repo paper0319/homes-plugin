@@ -24,7 +24,7 @@ This plugin allows players to set multiple homes, manage them via a GUI, share t
     *   Features include cooldowns, warmup time (5s), and movement cancellation.
     *   **Vanish-aware**: vanished players (SuperVanish / PremiumVanish / EssentialsX / CMI) are hidden from TPA lists, tab-completion, and cannot be targeted.
 *   **Back Command**:
-    *   Return to your previous location or death point using `/back`.
+    *   Return to your death location using `/back`.
 *   **Economy Support**:
     *   Integration with Vault to charge for setting homes, teleporting, etc.
 *   **Permission Bypass**:
@@ -157,7 +157,7 @@ Developed by **naonao**.
 | `/tpcancel <プレイヤー>` | 送ったリクエストをキャンセルします。 | — |
 | `/tpatoggle` | TPAの受信拒否設定を切り替えます。 | — |
 | `/tpaignore <プレイヤー>` | 特定のプレイヤーからのTPAを無視します。 | — |
-| `/back` | 直前の場所（または死亡地点）に戻ります。 | — |
+| `/back` | 死亡地点に戻ります。 | — |
 
 ### 🔑 権限
 

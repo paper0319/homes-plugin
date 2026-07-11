@@ -46,9 +46,9 @@ settings:
     enabled: true       # /tpa, /tpahere などを使えるようにするか
     cooldown: 60        # TPA送信後、次に送れるまでのクールダウン (秒)
 
-  # /back (直前の場所・死亡地点に戻る) 機能
+  # /back (死亡地点に戻る) 機能
   back:
-    enabled: true       # /back を使えるようにするか (テレポート前・死亡地点の保存も含む)
+    enabled: true       # /back を使えるようにするか (死亡地点の保存も含む)
 
   # アップデート確認
   spawn:
@@ -63,6 +63,8 @@ economy:
     set-home: 1000.0
     teleport: 50.0
     make-public: 5000.0
+    tpa: 0.0          # /tpa・/tpahere の料金（承認時にリクエスト送信者が支払う）
+    back: 0.0         # /back の料金
 
 database:
   # h2, mariadb, or mysql
@@ -130,7 +132,7 @@ gui:
   back-button:
     name: "&b戻る"
     lore:
-      - "&7クリックして直前の場所へ戻る"
+      - "&7クリックして死亡地点へ戻る"
   favorite-button:
     name-off: "&aお気に入りモード: OFF"
     name-on: "&eお気に入りモード: ON"

@@ -30,7 +30,7 @@ public class DeathListener implements Listener {
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         if (plugin.getConfig().getBoolean("settings.back.enabled", true)
-                && tpaManager.trySaveLastLocation(event.getEntity())) {
+                && tpaManager.saveDeathLocation(event.getEntity())) {
             pendingBackHint.add(event.getEntity().getUniqueId());
         }
     }

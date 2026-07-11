@@ -95,7 +95,7 @@ class TpaManagerBackTest {
         TpaManager tpaManager = plugin.getTpaManager();
 
         player.teleport(new Location(world, 0.5, 65.0, 0.5));
-        tpaManager.saveLastLocation(player);
+        tpaManager.saveDeathLocation(player);
         player.teleport(new Location(world, 20.5, 65.0, 20.5));
         tpaManager.clearPlayerState(player.getUniqueId());
         drain(player);
@@ -107,5 +107,22 @@ class TpaManagerBackTest {
         assertEquals(0.5, player.getLocation().getZ(), 0.001);
         assertTrue(drain(player).stream().anyMatch(TpaManagerBackTest::isBackSuccess),
                 "reconnect cleanup should not discard the saved /back destination");
+    }
+
+    @Test
+    void normalTeleportDoesNotCreateBackDestination() {
+        plugin.getConfig().set("settings.teleport.delay", 0);
+        World world = server.addSimpleWorld("world");
+        world.getBlockAt(0, 64, 0).setType(Material.STONE);
+        world.getBlockAt(10, 64, 10).setType(Material.STONE);
+        PlayerMock player = server.addPlayer();
+        player.teleport(new Location(world, 0.5, 65.0, 0.5));
+
+        plugin.getTeleportManager().teleport(player, new Location(world, 10.5, 65.0, 10.5), true);
+        drain(player);
+        plugin.getTpaManager().teleportBack(player);
+
+        assertTrue(drain(player).stream().anyMatch(TpaManagerBackTest::isNoLocation),
+                "normal teleports must not create a /back destination");
     }
 }

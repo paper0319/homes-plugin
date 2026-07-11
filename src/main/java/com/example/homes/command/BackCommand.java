@@ -5,7 +5,7 @@ import org.bukkit.entity.Player;
 import com.example.homes.HomesPlugin;
 import com.example.homes.manager.TpaManager;
 
-/** /back - 直前の場所 (死亡地点含む) に戻る。 */
+/** /back - 死亡地点に戻る。 */
 public class BackCommand extends PlayerCommandBase {
 
     private final TpaManager tpaManager;

@@ -137,7 +137,7 @@ class TeleportBypassTest {
 
         PlayerMock player = server.addPlayer();
         player.teleport(new Location(world, 0.5, 65, 0.5));
-        plugin.getTpaManager().saveLastLocation(player);
+        plugin.getTpaManager().saveDeathLocation(player);
         player.teleport(new Location(world, 20.5, 65, 20.5));
         drain(player);
 

@@ -83,7 +83,6 @@ public class TeleportManager {
                     return;
                 }
                 startWarmup(player, () -> {
-                    saveLocationBeforeTeleport(player);
                     player.teleport(safe);
                     playTeleportEffect(player);
                     player.sendMessage(plugin.msg(successMessageKey));
@@ -96,7 +95,6 @@ public class TeleportManager {
                     player.sendMessage(plugin.msg("teleport-target-not-found"));
                     return;
                 }
-                saveLocationBeforeTeleport(player);
                 player.teleport(targetPlayer.getLocation());
                 playTeleportEffect(player);
                 player.sendMessage(plugin.msg(successMessageKey));
@@ -121,8 +119,6 @@ public class TeleportManager {
         exact.setX(target.getBlockX() + 0.5);
         exact.setZ(target.getBlockZ() + 0.5);
         startWarmup(player, () -> {
-            // /back 用に直前の位置を保存してから、ブロック中央へテレポートする
-            saveLocationBeforeTeleport(player);
             player.teleport(exact);
             playTeleportEffect(player);
             player.sendMessage(plugin.msg("teleport-success"));
@@ -235,12 +231,6 @@ public class TeleportManager {
         } catch (IllegalArgumentException ignored) {
             return BossBar.Color.GREEN;
         }
-    }
-
-    private void saveLocationBeforeTeleport(Player player) {
-        if (tpaManager == null) return;
-        if (!plugin.getConfig().getBoolean("settings.back.enabled", true)) return;
-        tpaManager.saveLastLocation(player);
     }
 
     private void playTeleportEffect(Player player) {

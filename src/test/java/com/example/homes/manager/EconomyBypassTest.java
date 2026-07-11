@@ -38,6 +38,8 @@ class EconomyBypassTest {
         plugin = MockBukkit.load(HomesPlugin.class);
         plugin.getConfig().set("economy.enabled", true);
         plugin.getConfig().set("economy.cost.teleport", 100.0);
+        plugin.getConfig().set("economy.cost.tpa", 25.0);
+        plugin.getConfig().set("economy.cost.back", 75.0);
     }
 
     @AfterEach
@@ -110,5 +112,16 @@ class EconomyBypassTest {
         plugin.getEconomyManager().refund(player, null);
 
         assertEquals(1000, economy.getBalance(player), "費用キーが無い経路 (/back 等) では払い戻さない");
+    }
+
+    @Test
+    void tpaAndBackCostsUseTheirOwnConfigKeys() {
+        PlayerMock player = server.addPlayer();
+        economy.setBalance(player, 1000);
+
+        assertTrue(plugin.getEconomyManager().charge(player, "tpa"));
+        assertTrue(plugin.getEconomyManager().charge(player, "back"));
+
+        assertEquals(900, economy.getBalance(player));
     }
 }
