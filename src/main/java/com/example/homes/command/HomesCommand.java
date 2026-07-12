@@ -38,6 +38,7 @@ public class HomesCommand implements CommandExecutor {
             }
             plugin.reloadConfig();
             plugin.reloadValidationSettings();
+            plugin.configureSpawnCommands();
             LanguageManager languageManager = plugin.getLanguageManager();
             if (languageManager != null) {
                 languageManager.load();

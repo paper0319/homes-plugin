@@ -44,6 +44,15 @@ class HomesPluginSmokeTest {
     }
 
     @Test
+    void disabledSpawnFeatureUnregistersSpawnCommands() {
+        plugin.getConfig().set("settings.spawn.enabled", false);
+        plugin.configureSpawnCommands();
+
+        assertTrue(!plugin.getCommand("spawn").isRegistered());
+        assertTrue(!plugin.getCommand("setspawn").isRegistered());
+    }
+
+    @Test
     void messagesResolveFromBundledLanguageFile() {
         String msg = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                 .serialize(plugin.msg("no-permission"));

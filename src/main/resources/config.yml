@@ -52,6 +52,8 @@ settings:
 
   # アップデート確認
   spawn:
+    # false にすると /spawn・/setspawn と GUI のスポーンボタンを無効化します。
+    # コマンド登録も解除するため、他プラグインの同名コマンドを優先できます。
     enabled: true
 
   update-check:

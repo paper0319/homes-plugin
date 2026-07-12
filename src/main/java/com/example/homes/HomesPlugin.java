@@ -2,6 +2,7 @@ package com.example.homes;
 
 import org.bstats.bukkit.Metrics;
 import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -169,14 +170,46 @@ public class HomesPlugin extends JavaPlugin {
         setExecutor("tpcancel", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.CANCEL));
         setExecutor("tpaignore", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.IGNORE));
         setExecutor("back", new BackCommand(this, tpaManager));
-        setExecutor("spawn", new SpawnCommand(this, spawnManager));
-        setExecutor("setspawn", new SetSpawnCommand(this, spawnManager));
+        configureSpawnCommands();
 
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpaignore", "tpatoggle", "tpaauto", "back",
                 "spawn", "setspawn"}) {
             setTabCompleter(name, tabCompleter);
+        }
+    }
+
+    /**
+     * スポーン機能が無効なときは、/spawn と /setspawn をコマンドマップから外す。
+     * これにより、同名コマンドを提供するほかのプラグインを妨げない。
+     */
+    public void configureSpawnCommands() {
+        boolean enabled = getConfig().getBoolean("settings.spawn.enabled", true);
+        CommandMap commandMap = getServer().getCommandMap();
+
+        configureSpawnCommand(commandMap, "spawn", new SpawnCommand(this, spawnManager), enabled);
+        configureSpawnCommand(commandMap, "setspawn", new SetSpawnCommand(this, spawnManager), enabled);
+    }
+
+    private void configureSpawnCommand(CommandMap commandMap, String commandName,
+            CommandExecutor executor, boolean enabled) {
+        PluginCommand command = getCommand(commandName);
+        if (command == null) return;
+
+        if (!enabled) {
+            // Command#unregister は登録状態だけを外すため、CommandMap 内の
+            // /spawn と homes:spawn などの名前エントリも取り除く。
+            commandMap.getKnownCommands().entrySet().removeIf(entry -> entry.getValue() == command);
+            command.unregister(commandMap);
+            return;
+        }
+
+        command.setExecutor(executor);
+        if (!command.isRegistered()) {
+            // 既に同名コマンドがある場合は Bukkit がそのコマンドを維持する。
+            // HomesPlugin 側は名前空間付きコマンドだけが利用可能になり、上書きしない。
+            commandMap.register(getName().toLowerCase(java.util.Locale.ROOT), command);
         }
     }
 
