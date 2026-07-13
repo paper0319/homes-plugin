@@ -17,6 +17,16 @@ public class SetSpawnCommand extends PlayerCommandBase {
     }
 
     @Override
+    protected String featureToggleKey() {
+        return "settings.spawn.enabled";
+    }
+
+    @Override
+    protected String featureDisabledMessageKey() {
+        return "spawn-feature-disabled";
+    }
+
+    @Override
     protected boolean execute(Player player, String[] args) {
         if (!player.hasPermission(SETSPAWN_PERMISSION) && !player.isOp()) {
             player.sendMessage(plugin.msg("no-permission"));

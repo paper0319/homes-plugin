@@ -75,4 +75,20 @@ class SpawnManagerTest {
         assertTrue(drain(player).stream().anyMatch(message -> message.contains("スポーン") || message.toLowerCase().contains("spawn")));
     }
 
+    @Test
+    void disabledSpawnFeatureAlsoGuardsSetSpawn() {
+        World world = server.addSimpleWorld("world");
+        PlayerMock player = server.addPlayer();
+        player.setOp(true);
+        player.teleport(new Location(world, 12.5, 70.0, -4.5));
+        plugin.getConfig().set("settings.spawn.enabled", false);
+        plugin.configureSpawnCommands();
+        drain(player);
+
+        player.performCommand("setspawn");
+
+        assertNull(plugin.getSpawnManager().getSpawn());
+        assertTrue(!drain(player).isEmpty(), "the disabled-feature message should be sent");
+    }
+
 }

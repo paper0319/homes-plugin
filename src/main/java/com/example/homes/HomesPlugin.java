@@ -197,15 +197,13 @@ public class HomesPlugin extends JavaPlugin {
         PluginCommand command = getCommand(commandName);
         if (command == null) return;
 
+        // Paper exposes the known-command map as an unmodifiable view. Commands declared in
+        // plugin.yml stay registered; their executors enforce feature toggles at runtime.
+        command.setExecutor(executor);
         if (!enabled) {
-            // Command#unregister は登録状態だけを外すため、CommandMap 内の
-            // /spawn と homes:spawn などの名前エントリも取り除く。
-            commandMap.getKnownCommands().entrySet().removeIf(entry -> entry.getValue() == command);
-            command.unregister(commandMap);
             return;
         }
 
-        command.setExecutor(executor);
         if (!command.isRegistered()) {
             // 既に同名コマンドがある場合は Bukkit がそのコマンドを維持する。
             // HomesPlugin 側は名前空間付きコマンドだけが利用可能になり、上書きしない。

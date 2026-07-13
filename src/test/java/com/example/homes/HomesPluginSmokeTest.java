@@ -1,13 +1,24 @@
 package com.example.homes;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.Collections;
+import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.PluginCommand;
 
 /**
  * プラグイン全体の配線 (onEnable での Manager 初期化・イベント/コマンド登録・
@@ -44,12 +55,43 @@ class HomesPluginSmokeTest {
     }
 
     @Test
-    void disabledSpawnFeatureUnregistersSpawnCommands() {
+    void disabledSpawnFeatureKeepsGuardedCommandsRegistered() {
         plugin.getConfig().set("settings.spawn.enabled", false);
         plugin.configureSpawnCommands();
 
-        assertTrue(!plugin.getCommand("spawn").isRegistered());
-        assertTrue(!plugin.getCommand("setspawn").isRegistered());
+        assertTrue(plugin.getCommand("spawn").isRegistered());
+        assertTrue(plugin.getCommand("setspawn").isRegistered());
+    }
+
+    @Test
+    void disablingSpawnDoesNotMutatePaperKnownCommandsView() throws Exception {
+        PluginCommand command = plugin.getCommand("spawn");
+        Map<String, Command> knownCommands = Collections.unmodifiableMap(Map.of("spawn", command));
+        CommandMap commandMap = (CommandMap) Proxy.newProxyInstance(
+                CommandMap.class.getClassLoader(),
+                new Class<?>[] {CommandMap.class},
+                (proxy, method, args) -> method.getName().equals("getKnownCommands")
+                        ? knownCommands
+                        : defaultValue(method.getReturnType()));
+
+        Method configure = HomesPlugin.class.getDeclaredMethod("configureSpawnCommand",
+                CommandMap.class, String.class, CommandExecutor.class, boolean.class);
+        configure.setAccessible(true);
+
+        assertDoesNotThrow(() -> {
+            try {
+                configure.invoke(plugin, commandMap, "spawn", command.getExecutor(), false);
+            } catch (InvocationTargetException exception) {
+                throw exception.getCause();
+            }
+        });
+    }
+
+    private static Object defaultValue(Class<?> type) {
+        if (!type.isPrimitive()) return null;
+        if (type == boolean.class) return false;
+        if (type == char.class) return '\0';
+        return 0;
     }
 
     @Test
