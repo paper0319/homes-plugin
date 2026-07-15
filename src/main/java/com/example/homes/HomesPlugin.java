@@ -2,13 +2,14 @@ package com.example.homes;
 
 import org.bstats.bukkit.Metrics;
 import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.example.homes.command.BackCommand;
 import com.example.homes.command.DelHomeCommand;
+import com.example.homes.command.FeatureCommand;
+import com.example.homes.command.FeatureCommandRegistry;
 import com.example.homes.command.HomeCommand;
 import com.example.homes.command.HomesCommand;
 import com.example.homes.command.SetHomeCommand;
@@ -64,6 +65,7 @@ public class HomesPlugin extends JavaPlugin {
     private SessionCleanupListener sessionCleanupListener;
     private UpdateChecker updateChecker;
     private LanguageManager languageManager;
+    private final FeatureCommandRegistry featureCommandRegistry = new FeatureCommandRegistry(this);
 
     private volatile int maxHomeNameLength = 32;
     private volatile int maxHomeMemoLength = 15;
@@ -161,16 +163,7 @@ public class HomesPlugin extends JavaPlugin {
         setExecutor("sethome", new SetHomeCommand(this, homeManager, economyManager));
         setExecutor("delhome", new DelHomeCommand(this, homeManager, soundManager));
         setExecutor("vhome", new VHomeCommand(this, homeManager, homeGUI));
-        setExecutor("tpa", new TpaRequestCommand(this, tpaManager, tpaGUI, TpaManager.RequestType.TPA));
-        setExecutor("tpahere", new TpaRequestCommand(this, tpaManager, tpaGUI, TpaManager.RequestType.TPAHERE));
-        setExecutor("tpaccept", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.ACCEPT));
-        setExecutor("tpdeny", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.DENY));
-        setExecutor("tpatoggle", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.TOGGLE));
-        setExecutor("tpaauto", new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.AUTO));
-        setExecutor("tpcancel", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.CANCEL));
-        setExecutor("tpaignore", new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.IGNORE));
-        setExecutor("back", new BackCommand(this, tpaManager));
-        configureSpawnCommands();
+        configureFeatureCommands();
 
         HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
@@ -186,29 +179,56 @@ public class HomesPlugin extends JavaPlugin {
      */
     public void configureSpawnCommands() {
         boolean enabled = getConfig().getBoolean("settings.spawn.enabled", true);
-        CommandMap commandMap = getServer().getCommandMap();
-
-        configureSpawnCommand(commandMap, "spawn", new SpawnCommand(this, spawnManager), enabled);
-        configureSpawnCommand(commandMap, "setspawn", new SetSpawnCommand(this, spawnManager), enabled);
+        featureCommandRegistry.synchronize(enabled,
+                featureCommand("spawn", "スポーンへテレポートする", "/spawn",
+                        new SpawnCommand(this, spawnManager)),
+                featureCommand("setspawn", "スポーン地点を設定する", "/setspawn",
+                        new SetSpawnCommand(this, spawnManager)));
     }
 
-    private void configureSpawnCommand(CommandMap commandMap, String commandName,
-            CommandExecutor executor, boolean enabled) {
-        PluginCommand command = getCommand(commandName);
-        if (command == null) return;
+    /** Synchronizes every config-controlled command group with the command map. */
+    public void configureFeatureCommands() {
+        configureTpaCommands();
+        configureBackCommand();
+        configureSpawnCommands();
+    }
 
-        // Paper exposes the known-command map as an unmodifiable view. Commands declared in
-        // plugin.yml stay registered; their executors enforce feature toggles at runtime.
-        command.setExecutor(executor);
-        if (!enabled) {
-            return;
-        }
+    private void configureBackCommand() {
+        boolean enabled = getConfig().getBoolean("settings.back.enabled", true);
+        featureCommandRegistry.synchronize(enabled,
+                featureCommand("back", "死亡地点に戻る", "/back",
+                        new BackCommand(this, tpaManager)));
+    }
 
-        if (!command.isRegistered()) {
-            // 既に同名コマンドがある場合は Bukkit がそのコマンドを維持する。
-            // HomesPlugin 側は名前空間付きコマンドだけが利用可能になり、上書きしない。
-            commandMap.register(getName().toLowerCase(java.util.Locale.ROOT), command);
-        }
+    private void configureTpaCommands() {
+        boolean enabled = getConfig().getBoolean("settings.tpa.enabled", true);
+        featureCommandRegistry.synchronize(enabled,
+                featureCommand("tpa", "テレポートリクエストを送信する", "/tpa <プレイヤー名>",
+                        new TpaRequestCommand(this, tpaManager, tpaGUI, TpaManager.RequestType.TPA)),
+                featureCommand("tpahere", "相手を自分の場所へ呼ぶリクエストを送信する",
+                        "/tpahere <プレイヤー名>",
+                        new TpaRequestCommand(this, tpaManager, tpaGUI, TpaManager.RequestType.TPAHERE)),
+                featureCommand("tpaccept", "テレポートリクエストを承認する", "/tpaccept",
+                        new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.ACCEPT)),
+                featureCommand("tpdeny", "テレポートリクエストを拒否する", "/tpdeny",
+                        new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.DENY)),
+                featureCommand("tpcancel", "送信したテレポートリクエストをキャンセルする",
+                        "/tpcancel <プレイヤー名>",
+                        new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.CANCEL)),
+                featureCommand("tpaignore", "指定プレイヤーからのリクエストを無視する",
+                        "/tpaignore <プレイヤー名>",
+                        new TpaTargetCommand(this, tpaManager, TpaTargetCommand.Action.IGNORE)),
+                featureCommand("tpatoggle", "テレポートリクエストの受信を切り替える",
+                        "/tpatoggle",
+                        new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.TOGGLE)),
+                featureCommand("tpaauto", "テレポートリクエストの自動承認を切り替える",
+                        "/tpaauto",
+                        new TpaResponseCommand(this, tpaManager, TpaResponseCommand.Action.AUTO)));
+    }
+
+    private FeatureCommand featureCommand(String commandName, String description, String usage,
+            CommandExecutor executor) {
+        return new FeatureCommand(this, commandName, description, usage, executor);
     }
 
     private void setExecutor(String commandName, CommandExecutor executor) {
@@ -219,8 +239,11 @@ public class HomesPlugin extends JavaPlugin {
 
     private void setTabCompleter(String commandName, TabCompleter tabCompleter) {
         PluginCommand cmd = getCommand(commandName);
-        if (cmd == null) return;
-        cmd.setTabCompleter(tabCompleter);
+        if (cmd != null) {
+            cmd.setTabCompleter(tabCompleter);
+            return;
+        }
+        featureCommandRegistry.setTabCompleter(commandName, tabCompleter);
     }
 
     @Override

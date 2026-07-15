@@ -38,12 +38,13 @@ public class HomesCommand implements CommandExecutor {
             }
             plugin.reloadConfig();
             plugin.reloadValidationSettings();
-            plugin.configureSpawnCommands();
+            plugin.configureFeatureCommands();
             LanguageManager languageManager = plugin.getLanguageManager();
             if (languageManager != null) {
                 languageManager.load();
             }
             homeManager.reload();
+            plugin.getServer().getOnlinePlayers().forEach(Player::updateCommands);
             sender.sendMessage(plugin.msg("reload-success"));
             return true;
         }

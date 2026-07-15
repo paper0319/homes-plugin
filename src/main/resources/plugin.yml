@@ -20,39 +20,6 @@ commands:
   vhome:
     description: 他のプレイヤーの公開ホームを訪問する
     usage: /vhome <プレイヤー名>
-  tpa:
-    description: テレポートリクエストを送信する
-    usage: /tpa <プレイヤー名>
-  tpahere:
-    description: 自分の場所にテレポートさせるリクエストを送信する
-    usage: /tpahere <プレイヤー名>
-  tpaccept:
-    description: テレポートリクエストを承認する
-    usage: /tpaccept
-  tpdeny:
-    description: テレポートリクエストを拒否する
-    usage: /tpdeny
-  tpcancel:
-    description: テレポートリクエストをキャンセルする
-    usage: /tpcancel <プレイヤー名>
-  tpatoggle:
-    description: テレポートリクエストの受信設定を切り替える
-    usage: /tpatoggle
-  tpaauto:
-    description: テレポートリクエストの自動承認を切り替える
-    usage: /tpaauto
-  tpaignore:
-    description: 特定のプレイヤーからのリクエストを無視する
-    usage: /tpaignore <プレイヤー名>
-  back:
-    description: 死亡地点に戻る
-    usage: /back
-  spawn:
-    description: スポーンへテレポートする
-    usage: /spawn
-  setspawn:
-    description: スポーン地点を設定する
-    usage: /setspawn
 permissions:
   homes.admin:
     description: 他人のホームを閲覧・管理する権限

@@ -1,14 +1,10 @@
 package com.example.homes;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.Collections;
-import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,9 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandMap;
-import org.bukkit.command.PluginCommand;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginIdentifiableCommand;
 
 /**
  * プラグイン全体の配線 (onEnable での Manager 初期化・イベント/コマンド登録・
@@ -48,50 +43,66 @@ class HomesPluginSmokeTest {
     @Test
     void commandsAreRegistered() {
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
-                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpatoggle", "tpaignore", "back",
+                "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpatoggle", "tpaauto", "tpaignore", "back",
                 "spawn", "setspawn"}) {
-            assertNotNull(plugin.getCommand(name), "command not registered: " + name);
+            Command command = server.getCommandMap().getCommand(name);
+            assertNotNull(command, "command not registered: " + name);
+            assertTrue(command instanceof PluginIdentifiableCommand,
+                    "command does not identify its plugin: " + name);
+            assertSame(plugin, ((PluginIdentifiableCommand) command).getPlugin(),
+                    "command belongs to another plugin: " + name);
         }
     }
 
     @Test
-    void disabledSpawnFeatureKeepsGuardedCommandsRegistered() {
+    void disabledSpawnFeatureDoesNotClaimSpawnCommands() {
+        assertEquals("spawn", server.getCommandMap().getCommand("spawn").getName());
+        assertEquals("setspawn", server.getCommandMap().getCommand("setspawn").getName());
         plugin.getConfig().set("settings.spawn.enabled", false);
         plugin.configureSpawnCommands();
 
-        assertTrue(plugin.getCommand("spawn").isRegistered());
-        assertTrue(plugin.getCommand("setspawn").isRegistered());
+        assertNull(server.getCommandMap().getCommand("spawn"));
+        assertNull(server.getCommandMap().getCommand("setspawn"));
+        assertNull(server.getCommandMap().getCommand("homes:spawn"));
+        assertNull(server.getCommandMap().getCommand("homes:setspawn"));
     }
 
     @Test
-    void disablingSpawnDoesNotMutatePaperKnownCommandsView() throws Exception {
-        PluginCommand command = plugin.getCommand("spawn");
-        Map<String, Command> knownCommands = Collections.unmodifiableMap(Map.of("spawn", command));
-        CommandMap commandMap = (CommandMap) Proxy.newProxyInstance(
-                CommandMap.class.getClassLoader(),
-                new Class<?>[] {CommandMap.class},
-                (proxy, method, args) -> method.getName().equals("getKnownCommands")
-                        ? knownCommands
-                        : defaultValue(method.getReturnType()));
+    void disabledTpaFeatureDoesNotClaimAnyTpaCommand() {
+        plugin.getConfig().set("settings.tpa.enabled", false);
+        plugin.configureFeatureCommands();
 
-        Method configure = HomesPlugin.class.getDeclaredMethod("configureSpawnCommand",
-                CommandMap.class, String.class, CommandExecutor.class, boolean.class);
-        configure.setAccessible(true);
-
-        assertDoesNotThrow(() -> {
-            try {
-                configure.invoke(plugin, commandMap, "spawn", command.getExecutor(), false);
-            } catch (InvocationTargetException exception) {
-                throw exception.getCause();
-            }
-        });
+        for (String name : new String[] {"tpa", "tpahere", "tpaccept", "tpdeny",
+                "tpcancel", "tpaignore", "tpatoggle", "tpaauto"}) {
+            assertNull(server.getCommandMap().getCommand(name));
+            assertNull(server.getCommandMap().getCommand("homes:" + name));
+        }
     }
 
-    private static Object defaultValue(Class<?> type) {
-        if (!type.isPrimitive()) return null;
-        if (type == boolean.class) return false;
-        if (type == char.class) return '\0';
-        return 0;
+    @Test
+    void disabledBackFeatureDoesNotClaimBackCommand() {
+        plugin.getConfig().set("settings.back.enabled", false);
+        plugin.configureFeatureCommands();
+
+        assertNull(server.getCommandMap().getCommand("back"));
+        assertNull(server.getCommandMap().getCommand("homes:back"));
+    }
+
+    @Test
+    void disablingFeaturePromotesAnotherPluginsCommandToThePlainName() {
+        Command otherSpawn = new Command("spawn") {
+            @Override
+            public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+                return true;
+            }
+        };
+        server.getCommandMap().register("other", otherSpawn);
+
+        plugin.getConfig().set("settings.spawn.enabled", false);
+        plugin.configureFeatureCommands();
+
+        assertSame(otherSpawn, server.getCommandMap().getCommand("spawn"));
+        assertSame(otherSpawn, server.getCommandMap().getCommand("other:spawn"));
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.example.homes.manager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -76,7 +77,7 @@ class SpawnManagerTest {
     }
 
     @Test
-    void disabledSpawnFeatureAlsoGuardsSetSpawn() {
+    void disabledSpawnFeatureDoesNotHandleSetSpawn() {
         World world = server.addSimpleWorld("world");
         PlayerMock player = server.addPlayer();
         player.setOp(true);
@@ -85,10 +86,10 @@ class SpawnManagerTest {
         plugin.configureSpawnCommands();
         drain(player);
 
-        player.performCommand("setspawn");
+        boolean handled = player.performCommand("setspawn");
 
+        assertFalse(handled, "HomesPlugin must yield /setspawn when the feature is disabled");
         assertNull(plugin.getSpawnManager().getSpawn());
-        assertTrue(!drain(player).isEmpty(), "the disabled-feature message should be sent");
     }
 
 }
