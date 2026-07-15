@@ -2,6 +2,7 @@ package com.example.homes.command;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -11,6 +12,8 @@ import java.util.Set;
 
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.PluginIdentifiableCommand;
 import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.Plugin;
@@ -22,47 +25,69 @@ import org.bukkit.plugin.Plugin;
 public final class FeatureCommandRegistry {
 
     private final Plugin plugin;
-    private final Map<String, FeatureCommand> activeCommands = new HashMap<>();
+    private final Map<String, Command> managedCommands = new HashMap<>();
+    private final Map<String, Boolean> restorePlainName = new HashMap<>();
     private final Map<String, TabCompleter> tabCompleters = new HashMap<>();
 
     public FeatureCommandRegistry(Plugin plugin) {
         this.plugin = plugin;
     }
 
-    public void synchronize(boolean enabled, FeatureCommand... commands) {
+    public void synchronize(boolean enabled, FeatureCommand... candidates) {
+        CommandMap commandMap = plugin.getServer().getCommandMap();
+        for (FeatureCommand candidate : candidates) {
+            Command command = managedCommands.computeIfAbsent(candidate.getName(),
+                    name -> findDeclaredCommand(commandMap, name, candidate));
+            setExecutor(command, candidate.getExecutor());
+            setTabCompleter(command, tabCompleters.get(candidate.getName()));
+        }
+
         if (!enabled) {
-            disable(commands);
+            disable(commandMap, candidates);
             return;
         }
 
-        CommandMap commandMap = plugin.getServer().getCommandMap();
-        for (FeatureCommand candidate : commands) {
-            candidate.setTabCompleter(tabCompleters.get(candidate.getName()));
-            FeatureCommand active = activeCommands.get(candidate.getName());
-            if (active == null) {
-                activeCommands.put(candidate.getName(), candidate);
-                commandMap.register(plugin.getName().toLowerCase(java.util.Locale.ROOT), candidate);
-            } else {
-                active.setExecutor(candidate.getExecutor());
+        for (FeatureCommand candidate : candidates) {
+            Command command = managedCommands.get(candidate.getName());
+            if (!command.isRegistered()) {
+                commandMap.register(pluginPrefix(), command);
+                if (restorePlainName.getOrDefault(candidate.getName(), false)) {
+                    restorePlainMapping(commandMap, candidate.getName(), command);
+                }
             }
         }
     }
 
     public void setTabCompleter(String commandName, TabCompleter tabCompleter) {
         tabCompleters.put(commandName, tabCompleter);
-        FeatureCommand command = activeCommands.get(commandName);
-        if (command != null) command.setTabCompleter(tabCompleter);
+        Command command = managedCommands.get(commandName);
+        if (command != null) setTabCompleter(command, tabCompleter);
     }
 
-    private void disable(FeatureCommand[] candidates) {
-        CommandMap commandMap = plugin.getServer().getCommandMap();
+    private Command findDeclaredCommand(CommandMap commandMap, String commandName,
+            FeatureCommand fallback) {
+        Command command = commandMap.getCommand(pluginPrefix() + ":" + commandName);
+        if (command instanceof PluginIdentifiableCommand identifiable
+                && identifiable.getPlugin() == plugin) {
+            return command;
+        }
+        return fallback;
+    }
+
+    private void disable(CommandMap commandMap, FeatureCommand[] candidates) {
         Set<Command> disabledCommands = Collections.newSetFromMap(new IdentityHashMap<>());
         String[] commandNames = new String[candidates.length];
         for (int i = 0; i < candidates.length; i++) {
             String commandName = candidates[i].getName();
             commandNames[i] = commandName;
-            FeatureCommand command = activeCommands.get(commandName);
-            if (command != null) disabledCommands.add(command);
+            Command command = managedCommands.get(commandName);
+            if (command != null) {
+                disabledCommands.add(command);
+                if (command.isRegistered()) {
+                    restorePlainName.put(commandName,
+                            commandMap.getCommand(commandName) == command);
+                }
+            }
         }
         if (disabledCommands.isEmpty()) return;
 
@@ -74,13 +99,18 @@ public final class FeatureCommandRegistry {
             disabledCommands.forEach(command -> command.unregister(commandMap));
             removeMappings(knownCommands, disabledCommands);
             replacements.forEach(knownCommands::put);
-            for (String commandName : commandNames) {
-                FeatureCommand command = activeCommands.get(commandName);
-                if (disabledCommands.contains(command)) activeCommands.remove(commandName);
-            }
         } catch (ReflectiveOperationException | RuntimeException exception) {
             plugin.getLogger().warning("Could not unregister disabled feature commands: "
                     + exception.getMessage());
+        }
+    }
+
+    private void restorePlainMapping(CommandMap commandMap, String commandName, Command command) {
+        try {
+            knownCommands(commandMap).put(commandName, command);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            plugin.getLogger().warning("Could not restore enabled command /" + commandName
+                    + ": " + exception.getMessage());
         }
     }
 
@@ -105,14 +135,51 @@ public final class FeatureCommandRegistry {
             String[] commandNames, Set<Command> disabledCommands) {
         Map<String, Command> replacements = new LinkedHashMap<>();
         for (String commandName : commandNames) {
+            Command plainCommand = knownCommands.get(commandName);
+            if (plainCommand != null && !disabledCommands.contains(plainCommand)) {
+                replacements.put(commandName, plainCommand);
+                continue;
+            }
+
             String suffix = ":" + commandName;
             knownCommands.entrySet().stream()
                     .filter(entry -> entry.getKey().endsWith(suffix))
                     .filter(entry -> !disabledCommands.contains(entry.getValue()))
+                    .min(Comparator.comparingInt(entry -> pluginLoadOrder(entry.getValue())))
                     .map(Map.Entry::getValue)
-                    .findFirst()
                     .ifPresent(command -> replacements.put(commandName, command));
         }
         return replacements;
+    }
+
+    private int pluginLoadOrder(Command command) {
+        if (!(command instanceof PluginIdentifiableCommand identifiable)) {
+            return Integer.MAX_VALUE;
+        }
+        Plugin[] plugins = plugin.getServer().getPluginManager().getPlugins();
+        for (int i = 0; i < plugins.length; i++) {
+            if (plugins[i] == identifiable.getPlugin()) return i;
+        }
+        return Integer.MAX_VALUE;
+    }
+
+    private void setExecutor(Command command, org.bukkit.command.CommandExecutor executor) {
+        if (command instanceof PluginCommand pluginCommand) {
+            pluginCommand.setExecutor(executor);
+        } else if (command instanceof FeatureCommand featureCommand) {
+            featureCommand.setExecutor(executor);
+        }
+    }
+
+    private void setTabCompleter(Command command, TabCompleter tabCompleter) {
+        if (command instanceof PluginCommand pluginCommand) {
+            pluginCommand.setTabCompleter(tabCompleter);
+        } else if (command instanceof FeatureCommand featureCommand) {
+            featureCommand.setTabCompleter(tabCompleter);
+        }
+    }
+
+    private String pluginPrefix() {
+        return plugin.getName().toLowerCase(java.util.Locale.ROOT);
     }
 }

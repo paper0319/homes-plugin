@@ -106,6 +106,26 @@ class HomesPluginSmokeTest {
     }
 
     @Test
+    void reEnablingFeatureRestoresHomesOriginalPlainNamePriority() {
+        Command homesSpawn = server.getCommandMap().getCommand("spawn");
+        Command otherSpawn = new Command("spawn") {
+            @Override
+            public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+                return true;
+            }
+        };
+        server.getCommandMap().register("other", otherSpawn);
+
+        plugin.getConfig().set("settings.spawn.enabled", false);
+        plugin.configureFeatureCommands();
+        assertSame(otherSpawn, server.getCommandMap().getCommand("spawn"));
+
+        plugin.getConfig().set("settings.spawn.enabled", true);
+        plugin.configureFeatureCommands();
+        assertSame(homesSpawn, server.getCommandMap().getCommand("spawn"));
+    }
+
+    @Test
     void messagesResolveFromBundledLanguageFile() {
         String msg = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                 .serialize(plugin.msg("no-permission"));
