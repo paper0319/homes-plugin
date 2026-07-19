@@ -1,4 +1,5 @@
 # HomesPlugin
+## サポートを受ける [![Discord](https://img.shields.io/badge/Discord-Join-blue?logo=discord&logoColor=white)](https://discord.gg/pkxGMSgV86)
 
 [English](README.md) | [日本語](README_JP.md)
 
