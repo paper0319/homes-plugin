@@ -1,5 +1,5 @@
 # HomesPlugin　
-Get Support [![Discord](https://img.shields.io/discord/1525312246706864279?style=flat&logo=discord&logoColor=white)](https://discord.gg/pkxGMSgV86)
+## Get Support [![Discord](https://img.shields.io/badge/Discord-Join-blue?logo=discord&logoColor=white)](https://discord.gg/pkxGMSgV86)
 
 [English](#english) | [日本語](#japanese)
 
