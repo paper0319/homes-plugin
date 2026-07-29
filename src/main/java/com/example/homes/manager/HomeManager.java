@@ -27,10 +27,10 @@ public class HomeManager {
     private final HomeRepository repository;
 
     private static final class HomeRecord {
-        private Location location;
-        private boolean isPublic;
-        private boolean isFavorite;
-        private String memo;
+        private volatile Location location;
+        private volatile boolean isPublic;
+        private volatile boolean isFavorite;
+        private volatile String memo;
 
         private HomeRecord(Location location, boolean isPublic, boolean isFavorite, String memo) {
             this.location = location;
@@ -60,15 +60,17 @@ public class HomeManager {
      * 操作したプレイヤーがオンラインなら保存失敗を通知する。
      */
     private void runWriteAsync(UUID actorUuid, String description, Runnable write) {
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+        plugin.getFoliaScheduler().runAsync(() -> {
             try {
                 write.run();
             } catch (RuntimeException e) {
                 plugin.getLogger().log(Level.SEVERE, "DB write failed: " + description, e);
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                plugin.getFoliaScheduler().runGlobal(() -> {
                     Player actor = plugin.getServer().getPlayer(actorUuid);
                     if (actor != null) {
-                        actor.sendMessage(plugin.msg("save-failed"));
+                        plugin.getFoliaScheduler().runEntity(
+                                actor,
+                                () -> actor.sendMessage(plugin.msg("save-failed")));
                     }
                 });
             }
@@ -90,14 +92,14 @@ public class HomeManager {
         return loading.computeIfAbsent(uuid, id -> {
             CompletableFuture<Void> future = new CompletableFuture<>();
             loaded.remove(id);
-            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            plugin.getFoliaScheduler().runAsync(() -> {
                 try {
                     Map<String, HomeData> homeData = repository.getHomesData(id);
                     Map<String, Boolean> publicStatus = repository.getHomePublicStatus(id);
                     Map<String, Boolean> favoriteStatus = repository.getHomeFavoriteStatus(id);
                     Map<String, String> memos = repository.getHomeMemos(id);
 
-                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    plugin.getFoliaScheduler().runGlobal(() -> {
                         Map<String, HomeRecord> homes = new ConcurrentHashMap<>();
                         for (Map.Entry<String, HomeData> e : homeData.entrySet()) {
                             HomeData d = e.getValue();
@@ -125,7 +127,7 @@ public class HomeManager {
                         future.complete(null);
                     });
                 } catch (RuntimeException e) {
-                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    plugin.getFoliaScheduler().runGlobal(() -> {
                         loading.remove(id);
                         future.completeExceptionally(e);
                     });
@@ -332,7 +334,8 @@ public class HomeManager {
         loaded.clear();
         loading.clear();
         for (Player p : plugin.getServer().getOnlinePlayers()) {
-            loadHomes(p.getUniqueId());
+            plugin.getFoliaScheduler().runEntity(
+                    p, () -> loadHomes(p.getUniqueId()));
         }
     }
 
@@ -345,9 +348,9 @@ public class HomeManager {
     }
 
     public void refreshPlayersWithPublicHomes() {
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+        plugin.getFoliaScheduler().runAsync(() -> {
             List<UUID> uuids = repository.getPlayerUuidsWithPublicHomes();
-            plugin.getServer().getScheduler().runTask(plugin, () -> {
+            plugin.getFoliaScheduler().runGlobal(() -> {
                 List<String> players = new ArrayList<>();
                 Map<String, UUID> nameToUuid = new HashMap<>();
                 for (UUID uuid : uuids) {

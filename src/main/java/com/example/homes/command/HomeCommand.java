@@ -35,7 +35,7 @@ public class HomeCommand extends PlayerCommandBase {
             player.sendMessage(plugin.msg("loading-homes"));
         }
         homeManager.getHomeAsync(player.getUniqueId(), homeName).thenAccept(loc ->
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                plugin.getFoliaScheduler().runEntity(player, () -> {
                     if (loc == null) {
                         player.sendMessage(plugin.msg("home-not-found", "name", homeName));
                         player.sendMessage(plugin.msg("use-gui-info"));

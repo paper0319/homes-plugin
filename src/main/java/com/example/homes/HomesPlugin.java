@@ -32,6 +32,7 @@ import com.example.homes.manager.HomeManager;
 import com.example.homes.manager.HomeTabCompleter;
 import com.example.homes.manager.InputListener;
 import com.example.homes.manager.LanguageManager;
+import com.example.homes.manager.OnlinePlayerSnapshotCache;
 import com.example.homes.manager.SessionCleanupListener;
 import com.example.homes.manager.SessionManager;
 import com.example.homes.manager.SoundManager;
@@ -39,6 +40,7 @@ import com.example.homes.manager.SpawnManager;
 import com.example.homes.manager.TeleportManager;
 import com.example.homes.manager.TpaManager;
 import com.example.homes.manager.UpdateChecker;
+import com.example.homes.util.FoliaScheduler;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -65,6 +67,8 @@ public class HomesPlugin extends JavaPlugin {
     private SessionCleanupListener sessionCleanupListener;
     private UpdateChecker updateChecker;
     private LanguageManager languageManager;
+    private OnlinePlayerSnapshotCache onlinePlayerSnapshotCache;
+    private final FoliaScheduler foliaScheduler = new FoliaScheduler(this);
     private final FeatureCommandRegistry featureCommandRegistry = new FeatureCommandRegistry(this);
 
     private volatile int maxHomeNameLength = 32;
@@ -88,6 +92,10 @@ public class HomesPlugin extends JavaPlugin {
 
     public LanguageManager getLanguageManager() {
         return languageManager;
+    }
+
+    public FoliaScheduler getFoliaScheduler() {
+        return foliaScheduler;
     }
 
     @Override
@@ -126,6 +134,7 @@ public class HomesPlugin extends JavaPlugin {
         this.dataListener = new DataListener(homeManager);
         this.deathListener = new DeathListener(this, tpaManager);
         this.sessionCleanupListener = new SessionCleanupListener(sessionManager, tpaManager);
+        this.onlinePlayerSnapshotCache = new OnlinePlayerSnapshotCache(this);
 
         // Link GUI and Input Listener
         this.homeGUI.setInputListener(inputListener);
@@ -140,6 +149,7 @@ public class HomesPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(sessionCleanupListener, this);
         getServer().getPluginManager().registerEvents(tpaGUI, this);
         getServer().getPluginManager().registerEvents(tpaActionGUI, this);
+        getServer().getPluginManager().registerEvents(onlinePlayerSnapshotCache, this);
 
         registerCommands();
 
@@ -165,7 +175,8 @@ public class HomesPlugin extends JavaPlugin {
         setExecutor("vhome", new VHomeCommand(this, homeManager, homeGUI));
         configureFeatureCommands();
 
-        HomeTabCompleter tabCompleter = new HomeTabCompleter(homeManager, this);
+        HomeTabCompleter tabCompleter = new HomeTabCompleter(
+                homeManager, this, onlinePlayerSnapshotCache);
         for (String name : new String[] {"home", "homes", "sethome", "delhome", "vhome",
                 "tpa", "tpahere", "tpaccept", "tpdeny", "tpcancel", "tpaignore", "tpatoggle", "tpaauto", "back",
                 "spawn", "setspawn"}) {

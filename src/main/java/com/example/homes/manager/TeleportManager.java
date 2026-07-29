@@ -1,15 +1,20 @@
 package com.example.homes.manager;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.UnsafeTeleportConfirmGUI;
@@ -21,11 +26,11 @@ import net.kyori.adventure.title.Title;
 
 public class TeleportManager {
 
+    private static final String DEFAULT_SUCCESS_KEY = "teleport-success";
+
     private final HomesPlugin plugin;
     private final SoundManager soundManager;
     private final TpaManager tpaManager;
-
-    /** 危険な場所への確認テレポートをクリックで確定させる GUI。HomesPlugin の onEnable で注入される。 */
     private UnsafeTeleportConfirmGUI unsafeConfirmGUI;
 
     public TeleportManager(HomesPlugin plugin, SoundManager soundManager, TpaManager tpaManager) {
@@ -38,76 +43,87 @@ public class TeleportManager {
         this.unsafeConfirmGUI = unsafeConfirmGUI;
     }
 
-    /** テレポート完了時に送る既定の成功メッセージキー。 */
-    private static final String DEFAULT_SUCCESS_KEY = "teleport-success";
-
     public void teleport(Player player, Location target) {
-        // /home・GUI からのテレポートは "teleport" 費用を徴収済み。キャンセル時はこれを払い戻す。
-        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY, "teleport");
+        teleportToLocation(player, target, false, DEFAULT_SUCCESS_KEY, "teleport");
     }
 
     public void teleport(Player player, Location target, boolean allowWater) {
-        teleport(player, (Object) target, allowWater, DEFAULT_SUCCESS_KEY, null);
+        teleportToLocation(player, target, allowWater, DEFAULT_SUCCESS_KEY, null);
     }
 
-    /**
-     * 場所へテレポートし、完了時に {@code successMessageKey} のメッセージを送る。
-     * ウォームアップがある場合でも、成功メッセージは実際にテレポートが
-     * 完了した時点でのみ送られる (開始時には teleport-start のみ)。
-     */
     public void teleport(Player player, Location target, boolean allowWater, String successMessageKey) {
-        // /back など費用を徴収しない経路。キャンセルしても払い戻しは無い。
-        teleport(player, (Object) target, allowWater, successMessageKey, null);
+        teleportToLocation(player, target, allowWater, successMessageKey, null);
     }
 
     public void teleport(Player player, Player target) {
-        teleport(player, (Object) target, false, DEFAULT_SUCCESS_KEY, null);
+        startWarmup(player, () -> teleportToPlayer(player, target));
     }
 
-    private void teleport(Player player, Object target, boolean allowWater, String successMessageKey, String refundCostKey) {
-        switch (target) {
-            case Location targetLocation -> {
-                // 危険判定はウォームアップより前に行う。安全地点が無ければ、
-                // カウントダウンを始める前に確認 GUI を開く (確認 → カウントダウンの順)。
-                Location safe = findSafeLocation(targetLocation, allowWater);
-                if (safe == null) {
-                    if (plugin.getConfig().getBoolean("settings.teleport.confirm-unsafe", true) && unsafeConfirmGUI != null) {
-                        soundManager.play(player, "teleport-fail");
-                        unsafeConfirmGUI.open(player, targetLocation.clone(), refundCostKey);
-                    } else {
-                        // 確認せず中止する設定。徴収済みなら払い戻す。
-                        player.sendMessage(plugin.msg("teleport-unsafe"));
-                        soundManager.play(player, "teleport-fail");
-                        plugin.getEconomyManager().refund(player, refundCostKey);
+    private void teleportToLocation(
+            Player player,
+            Location target,
+            boolean allowWater,
+            String successMessageKey,
+            String refundCostKey) {
+        if (target == null || target.getWorld() == null) {
+            player.sendMessage(plugin.msg("teleport-target-not-found"));
+            soundManager.play(player, "teleport-fail");
+            plugin.getEconomyManager().refund(player, refundCostKey);
+            return;
+        }
+
+        Location requested = target.clone();
+        findSafeLocationAsync(requested, allowWater).thenAccept(safe ->
+                plugin.getFoliaScheduler().runEntity(player, () -> {
+                    if (safe == null) {
+                        handleUnsafeDestination(player, requested, refundCostKey);
+                        return;
                     }
-                    return;
-                }
-                startWarmup(player, () -> {
-                    player.teleport(safe);
-                    playTeleportEffect(player);
-                    player.sendMessage(plugin.msg(successMessageKey));
-                    soundManager.play(player, "teleport-success");
-                });
+                    startWarmup(player, () ->
+                            teleportAsync(player, safe, successMessageKey, refundCostKey));
+                }));
+    }
+
+    private void teleportToPlayer(Player player, Player target) {
+        if (!target.isOnline()) {
+            player.sendMessage(plugin.msg("teleport-target-not-found"));
+            return;
+        }
+
+        boolean scheduled = plugin.getFoliaScheduler().runEntity(target, () -> {
+            if (!target.isOnline()) {
+                notifyMissingTarget(player);
+                return;
             }
-            case Player targetPlayer -> startWarmup(player, () -> {
-                // 移動先プレイヤーの位置はテレポート確定時に読み直す (待機中に動く場合に追従)
-                if (!targetPlayer.isOnline()) {
-                    player.sendMessage(plugin.msg("teleport-target-not-found"));
-                    return;
-                }
-                player.teleport(targetPlayer.getLocation());
-                playTeleportEffect(player);
-                player.sendMessage(plugin.msg(successMessageKey));
-                soundManager.play(player, "teleport-success");
-            });
-            default -> { }
+            Location destination = target.getLocation().clone();
+            plugin.getFoliaScheduler().runEntity(
+                    player,
+                    () -> teleportAsync(player, destination, DEFAULT_SUCCESS_KEY, null));
+        });
+        if (!scheduled) {
+            notifyMissingTarget(player);
         }
     }
 
-    /**
-     * 確認 GUI で「はい」が選ばれたときに呼ばれる。安全地点の探索は行わず、
-     * ウォームアップ後にホームの正確な座標へそのままテレポートする。
-     */
+    private void handleUnsafeDestination(Player player, Location target, String refundCostKey) {
+        if (plugin.getConfig().getBoolean("settings.teleport.confirm-unsafe", true)
+                && unsafeConfirmGUI != null) {
+            soundManager.play(player, "teleport-fail");
+            unsafeConfirmGUI.open(player, target, refundCostKey);
+            return;
+        }
+
+        player.sendMessage(plugin.msg("teleport-unsafe"));
+        soundManager.play(player, "teleport-fail");
+        plugin.getEconomyManager().refund(player, refundCostKey);
+    }
+
+    private void notifyMissingTarget(Player player) {
+        plugin.getFoliaScheduler().runEntity(
+                player,
+                () -> player.sendMessage(plugin.msg("teleport-target-not-found")));
+    }
+
     public void teleportUnsafeConfirmed(Player player, Location target) {
         if (target == null || target.getWorld() == null) {
             player.sendMessage(plugin.msg("teleport-target-not-found"));
@@ -118,19 +134,30 @@ public class TeleportManager {
         Location exact = target.clone();
         exact.setX(target.getBlockX() + 0.5);
         exact.setZ(target.getBlockZ() + 0.5);
-        startWarmup(player, () -> {
-            player.teleport(exact);
-            playTeleportEffect(player);
-            player.sendMessage(plugin.msg("teleport-success"));
-            soundManager.play(player, "teleport-success");
-        });
+        startWarmup(player, () ->
+                teleportAsync(player, exact, DEFAULT_SUCCESS_KEY, null));
     }
 
-    /**
-     * ウォームアップ (カウントダウン) を行い、完了したら {@code onComplete} を実行する共通処理。
-     * homes.bypass.teleportdelay 保持者 (既定で OP) は待ち時間なしで即実行する。
-     * 待機中に動くとキャンセルされる。
-     */
+    private void teleportAsync(
+            Player player,
+            Location destination,
+            String successMessageKey,
+            String refundCostKey) {
+        player.teleportAsync(destination).whenComplete((success, error) ->
+                plugin.getFoliaScheduler().runEntity(player, () -> {
+                    if (error != null || !Boolean.TRUE.equals(success)) {
+                        player.sendMessage(plugin.msg("teleport-target-not-found"));
+                        soundManager.play(player, "teleport-fail");
+                        plugin.getEconomyManager().refund(player, refundCostKey);
+                        return;
+                    }
+
+                    playTeleportEffect(player);
+                    player.sendMessage(plugin.msg(successMessageKey));
+                    soundManager.play(player, "teleport-success");
+                }));
+    }
+
     private void startWarmup(Player player, Runnable onComplete) {
         int delay = player.hasPermission("homes.bypass.teleportdelay")
                 ? 0
@@ -142,7 +169,6 @@ public class TeleportManager {
         }
 
         player.sendMessage(plugin.msg("teleport-start", "seconds", String.valueOf(delay)));
-
         Location initialLoc = player.getLocation().clone();
         BossBar bossBar = createWarmupBossBar(delay);
         if (bossBar != null) {
@@ -150,36 +176,36 @@ public class TeleportManager {
         }
         displayWarmupTick(player, bossBar, delay, delay);
 
-        new BukkitRunnable() {
-            int timeLeft = delay;
+        int[] timeLeft = { delay };
+        plugin.getFoliaScheduler().runEntityAtFixedRate(
+                player,
+                task -> {
+                    if (!player.isOnline()) {
+                        hideBossBar(player, bossBar);
+                        task.cancel();
+                        return;
+                    }
 
-            @Override
-            public void run() {
-                if (!player.isOnline()) {
-                    hideBossBar(player, bossBar);
-                    this.cancel();
-                    return;
-                }
+                    if (!player.getWorld().equals(initialLoc.getWorld())
+                            || player.getLocation().distance(initialLoc) > 0.1) {
+                        hideBossBar(player, bossBar);
+                        player.sendMessage(plugin.msg("teleport-cancelled"));
+                        soundManager.play(player, "teleport-fail");
+                        task.cancel();
+                        return;
+                    }
 
-                // Check movement
-                if (player.getLocation().distance(initialLoc) > 0.1) {
-                    hideBossBar(player, bossBar);
-                    player.sendMessage(plugin.msg("teleport-cancelled"));
-                    soundManager.play(player, "teleport-fail");
-                    this.cancel();
-                    return;
-                }
-
-                timeLeft--;
-                if (timeLeft <= 0) {
-                    hideBossBar(player, bossBar);
-                    onComplete.run();
-                    this.cancel();
-                } else {
-                    displayWarmupTick(player, bossBar, timeLeft, delay);
-                }
-            }
-        }.runTaskTimer(plugin, 20L, 20L);
+                    timeLeft[0]--;
+                    if (timeLeft[0] <= 0) {
+                        hideBossBar(player, bossBar);
+                        onComplete.run();
+                        task.cancel();
+                    } else {
+                        displayWarmupTick(player, bossBar, timeLeft[0], delay);
+                    }
+                },
+                20L,
+                20L);
     }
 
     private BossBar createWarmupBossBar(int delay) {
@@ -209,8 +235,7 @@ public class TeleportManager {
         player.showTitle(Title.title(
                 Component.text(String.valueOf(timeLeft), NamedTextColor.GREEN),
                 Component.empty(),
-                Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO)
-        ));
+                Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO)));
         soundManager.play(player, "teleport-count");
     }
 
@@ -234,18 +259,18 @@ public class TeleportManager {
     }
 
     private void playTeleportEffect(Player player) {
-        // Sound and Particles on arrival
         Location loc = player.getLocation();
-        // Increase count and spread for better visibility
-        player.getWorld().spawnParticle(Particle.PORTAL, loc.add(0, 1, 0), 100, 0.5, 1, 0.5);
-        player.getWorld().spawnParticle(Particle.END_ROD, loc, 50, 0.5, 1, 0.5); // Add End Rod for visibility
+        player.getWorld().spawnParticle(
+                Particle.PORTAL, loc.clone().add(0, 1, 0), 100, 0.5, 1, 0.5);
+        player.getWorld().spawnParticle(Particle.END_ROD, loc, 50, 0.5, 1, 0.5);
         player.getWorld().playSound(loc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
     }
 
-    private Location findSafeLocation(Location target, boolean allowWater) {
-        if (target == null) return null;
+    private CompletableFuture<Location> findSafeLocationAsync(Location target, boolean allowWater) {
         World world = target.getWorld();
-        if (world == null) return null;
+        if (world == null) {
+            return CompletableFuture.completedFuture(null);
+        }
 
         Location base = target.clone();
         base.setX(target.getBlockX() + 0.5);
@@ -253,46 +278,100 @@ public class TeleportManager {
 
         int minY = world.getMinHeight() + 1;
         int maxY = world.getMaxHeight() - 2;
-
         int baseX = base.getBlockX();
         int baseY = Math.max(minY, Math.min(maxY, base.getBlockY()));
         int baseZ = base.getBlockZ();
-
         int searchRadius = plugin.getConfig().getInt("settings.teleport.safe-search.radius", 2);
         int verticalRange = plugin.getConfig().getInt("settings.teleport.safe-search.vertical", 3);
+        List<Candidate> candidates = new ArrayList<>();
 
         for (int dy = 0; dy <= verticalRange; dy++) {
             int yUp = baseY + dy;
             int yDown = baseY - dy;
-
             if (yUp >= minY && yUp <= maxY) {
-                Location found = searchAround(world, baseX, yUp, baseZ, searchRadius, base.getYaw(), base.getPitch(), allowWater);
-                if (found != null) return found;
+                addCandidates(
+                        candidates, world, baseX, yUp, baseZ, searchRadius,
+                        base.getYaw(), base.getPitch());
             }
             if (dy != 0 && yDown >= minY && yDown <= maxY) {
-                Location found = searchAround(world, baseX, yDown, baseZ, searchRadius, base.getYaw(), base.getPitch(), allowWater);
-                if (found != null) return found;
+                addCandidates(
+                        candidates, world, baseX, yDown, baseZ, searchRadius,
+                        base.getYaw(), base.getPitch());
             }
         }
 
-        return null;
+        return findFirstSafeCandidate(world, candidates, allowWater);
     }
 
-    private Location searchAround(World world, int x, int y, int z, int radius, float yaw, float pitch, boolean allowWater) {
+    private void addCandidates(
+            List<Candidate> candidates,
+            World world,
+            int x,
+            int y,
+            int z,
+            int radius,
+            float yaw,
+            float pitch) {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                int cx = x + dx;
-                int cz = z + dz;
-
-                world.getChunkAt(cx >> 4, cz >> 4);
-
-                if (isSafeStand(world, cx, y, cz, allowWater)) {
-                    Location loc = new Location(world, cx + 0.5, y, cz + 0.5, yaw, pitch);
-                    return loc;
-                }
+                Location location = new Location(
+                        world, x + dx + 0.5, y, z + dz + 0.5, yaw, pitch);
+                candidates.add(new Candidate(candidates.size(), location));
             }
         }
-        return null;
+    }
+
+    private CompletableFuture<Location> findFirstSafeCandidate(
+            World world,
+            List<Candidate> candidates,
+            boolean allowWater) {
+        Map<ChunkCoordinates, List<Candidate>> byChunk = new HashMap<>();
+        for (Candidate candidate : candidates) {
+            Location location = candidate.location();
+            ChunkCoordinates chunk = new ChunkCoordinates(
+                    location.getBlockX() >> 4,
+                    location.getBlockZ() >> 4);
+            byChunk.computeIfAbsent(chunk, ignored -> new ArrayList<>()).add(candidate);
+        }
+
+        List<CompletableFuture<Candidate>> checks = new ArrayList<>();
+        for (Map.Entry<ChunkCoordinates, List<Candidate>> entry : byChunk.entrySet()) {
+            ChunkCoordinates chunk = entry.getKey();
+            CompletableFuture<Candidate> check = new CompletableFuture<>();
+            checks.add(check);
+            plugin.getFoliaScheduler().runRegion(
+                    entry.getValue().getFirst().location(),
+                    () -> {
+                        world.getChunkAt(chunk.x(), chunk.z());
+                        Candidate firstSafe = null;
+                        for (Candidate candidate : entry.getValue()) {
+                            Location location = candidate.location();
+                            if (isSafeStand(
+                                    world,
+                                    location.getBlockX(),
+                                    location.getBlockY(),
+                                    location.getBlockZ(),
+                                    allowWater)) {
+                                firstSafe = candidate;
+                                break;
+                            }
+                        }
+                        check.complete(firstSafe);
+                    });
+        }
+
+        return CompletableFuture.allOf(checks.toArray(CompletableFuture[]::new))
+                .thenApply(ignored -> {
+                    Candidate firstSafe = null;
+                    for (CompletableFuture<Candidate> check : checks) {
+                        Candidate candidate = check.join();
+                        if (candidate != null
+                                && (firstSafe == null || candidate.index() < firstSafe.index())) {
+                            firstSafe = candidate;
+                        }
+                    }
+                    return firstSafe == null ? null : firstSafe.location();
+                });
     }
 
     private boolean isSafeStand(World world, int x, int y, int z, boolean allowWater) {
@@ -300,25 +379,42 @@ public class TeleportManager {
         Block head = world.getBlockAt(x, y + 1, z);
         Block ground = world.getBlockAt(x, y - 1, z);
 
-        if (!feet.isPassable()) return false;
-        if (!head.isPassable()) return false;
+        if (!feet.isPassable() || !head.isPassable()) {
+            return false;
+        }
+        if (isHazard(feet.getType(), allowWater) || isHazard(head.getType(), allowWater)) {
+            return false;
+        }
 
-        if (isHazard(feet.getType(), allowWater) || isHazard(head.getType(), allowWater)) return false;
-
-        boolean groundIsWater = ground.getType() == org.bukkit.Material.WATER;
-        if (!ground.getType().isSolid() && !(allowWater && groundIsWater)) return false;
-        if (isHazard(ground.getType(), allowWater)) return false;
+        boolean groundIsWater = ground.getType() == Material.WATER;
+        if (!ground.getType().isSolid() && !(allowWater && groundIsWater)) {
+            return false;
+        }
+        if (isHazard(ground.getType(), allowWater)) {
+            return false;
+        }
 
         Block aboveHead = head.getRelative(BlockFace.UP);
         return !aboveHead.getType().isSolid();
     }
 
-    private boolean isHazard(org.bukkit.Material type, boolean allowWater) {
-        if (type == null) return true;
-        if (allowWater && type == org.bukkit.Material.WATER) return false;
+    private boolean isHazard(Material type, boolean allowWater) {
+        if (type == null) {
+            return true;
+        }
+        if (allowWater && type == Material.WATER) {
+            return false;
+        }
         return switch (type) {
-            case LAVA, WATER, FIRE, SOUL_FIRE, CAMPFIRE, SOUL_CAMPFIRE, CACTUS, MAGMA_BLOCK, SWEET_BERRY_BUSH, POWDER_SNOW -> true;
+            case LAVA, WATER, FIRE, SOUL_FIRE, CAMPFIRE, SOUL_CAMPFIRE,
+                    CACTUS, MAGMA_BLOCK, SWEET_BERRY_BUSH, POWDER_SNOW -> true;
             default -> false;
         };
+    }
+
+    private record Candidate(int index, Location location) {
+    }
+
+    private record ChunkCoordinates(int x, int z) {
     }
 }

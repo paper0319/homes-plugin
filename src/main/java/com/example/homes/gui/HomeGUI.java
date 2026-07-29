@@ -100,7 +100,8 @@ public class HomeGUI implements Listener {
     public void open(Player viewer, OfflinePlayer target) {
         if (!homeManager.isLoaded(target.getUniqueId())) {
             viewer.sendMessage(plugin.msg("loading-homes"));
-            homeManager.ensureLoaded(target.getUniqueId()).thenRun(() -> plugin.getServer().getScheduler().runTask(plugin, () -> open(viewer, target)));
+            homeManager.ensureLoaded(target.getUniqueId()).thenRun(
+                    () -> plugin.getFoliaScheduler().runEntity(viewer, () -> open(viewer, target)));
             return;
         }
 

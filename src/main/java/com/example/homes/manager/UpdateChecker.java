@@ -6,7 +6,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -50,7 +49,7 @@ public class UpdateChecker implements Listener {
 
     /** Kicks off an async fetch. Safe to call once during onEnable(). */
     public void checkAsync() {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, this::doCheck);
+        plugin.getFoliaScheduler().runAsync(this::doCheck);
     }
 
     private void doCheck() {

@@ -38,7 +38,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.11-R0.1-SNAPSHOT</version>
+            <version>26.2.build.84-stable</version>
             <scope>provided</scope>
         </dependency>
         <!-- H2 Database -->
@@ -61,6 +61,12 @@
             <artifactId>VaultAPI</artifactId>
             <version>1.7</version>
             <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.bukkit</groupId>
+                    <artifactId>bukkit</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <!-- bStats -->
         <dependency>
@@ -78,8 +84,8 @@
         </dependency>
         <dependency>
             <groupId>org.mockbukkit.mockbukkit</groupId>
-            <artifactId>mockbukkit-v1.21</artifactId>
-            <version>4.110.0</version>
+            <artifactId>mockbukkit-v26.1.2</artifactId>
+            <version>4.114.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -106,6 +112,28 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
                 <configuration>
+                    <!-- MockBukkit 26.1.2 is the newest published test runtime.
+                         Compile against Paper 26.2, but run MockBukkit with its
+                         matching registry/API data until a 26.2 artifact ships. -->
+                    <classpathDependencyExcludes>
+                        <classpathDependencyExclude>io.papermc.paper:paper-api</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-api</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-key</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-minimessage</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-serializer-commons</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-serializer-gson</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-serializer-json</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-serializer-legacy</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-serializer-plain</classpathDependencyExclude>
+                        <classpathDependencyExclude>net.kyori:adventure-text-logger-slf4j</classpathDependencyExclude>
+                    </classpathDependencyExcludes>
+                    <additionalClasspathDependencies>
+                        <additionalClasspathDependency>
+                            <groupId>io.papermc.paper</groupId>
+                            <artifactId>paper-api</artifactId>
+                            <version>26.1.2.build.74-stable</version>
+                        </additionalClasspathDependency>
+                    </additionalClasspathDependencies>
                     <systemPropertyVariables>
                         <!-- テストは shade (relocation) 前のクラスで走るため、bStats の relocation チェックを無効化 -->
                         <bstats.relocatecheck>false</bstats.relocatecheck>

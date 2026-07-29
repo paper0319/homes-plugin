@@ -19,6 +19,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 import com.example.homes.HomesPlugin;
 import com.example.homes.gui.holder.TpaActionGuiHolder;
 import com.example.homes.manager.TpaManager;
+import com.example.homes.util.VanishUtil;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -43,9 +44,29 @@ public class TpaActionGUI implements Listener {
     }
 
     public void open(Player viewer, Player target) {
-        TpaActionGuiHolder holder = new TpaActionGuiHolder(target.getUniqueId());
+        boolean canSeeHidden = viewer.hasPermission(VanishUtil.SEE_HIDDEN_PERMISSION);
+        Runnable unavailable = () -> plugin.getFoliaScheduler().runEntity(
+                viewer, () -> viewer.sendMessage(plugin.msg("player-not-found")));
+        plugin.getFoliaScheduler().runEntity(
+                target,
+                () -> {
+                    if (!target.isOnline()
+                            || (VanishUtil.isVanished(target) && !canSeeHidden)) {
+                        unavailable.run();
+                        return;
+                    }
+                    TpaPlayerSnapshot snapshot = new TpaPlayerSnapshot(
+                            target.getUniqueId(), target.getName(), target.getPlayerProfile());
+                    plugin.getFoliaScheduler().runEntity(
+                            viewer, () -> render(viewer, snapshot));
+                },
+                unavailable);
+    }
+
+    private void render(Player viewer, TpaPlayerSnapshot target) {
+        TpaActionGuiHolder holder = new TpaActionGuiHolder(target.uuid());
         String titleTmpl = plugin.getConfig().getString("gui.tpa-action.title", "&a{player}にリクエスト");
-        Component title = colorize(titleTmpl.replace("{player}", target.getName()));
+        Component title = colorize(titleTmpl.replace("{player}", target.name()));
         Inventory inv = Bukkit.createInventory(holder, GUI_SIZE, title);
         holder.setInventory(inv);
 
@@ -53,9 +74,9 @@ public class TpaActionGUI implements Listener {
         for (int i = 0; i < GUI_SIZE; i++) inv.setItem(i, border);
 
         inv.setItem(SLOT_TPAHERE, createActionButton("gui.tpa-action.tpahere-button",
-                Material.LIME_WOOL, "&a/TPAHere", target.getName()));
+                Material.LIME_WOOL, "&a/TPAHere", target.name()));
         inv.setItem(SLOT_TPA, createActionButton("gui.tpa-action.tpa-button",
-                Material.LIGHT_BLUE_WOOL, "&b/TPA", target.getName()));
+                Material.LIGHT_BLUE_WOOL, "&b/TPA", target.name()));
         inv.setItem(SLOT_HEAD, createTargetHead(target));
         inv.setItem(SLOT_BACK, createBackButton());
 
@@ -94,16 +115,16 @@ public class TpaActionGUI implements Listener {
         return item;
     }
 
-    private ItemStack createTargetHead(Player target) {
+    private ItemStack createTargetHead(TpaPlayerSnapshot target) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta meta = head.getItemMeta();
         if (meta instanceof SkullMeta sm) {
             // Use the live PlayerProfile so Bedrock skins applied by
             // GeyserSkinManager (when installed) are picked up automatically.
-            sm.setOwnerProfile(target.getPlayerProfile());
+            sm.setOwnerProfile(target.profile());
         }
         if (meta != null) {
-            meta.displayName(colorize("&e" + target.getName()));
+            meta.displayName(colorize("&e" + target.name()));
             head.setItemMeta(meta);
         }
         return head;

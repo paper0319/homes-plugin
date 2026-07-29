@@ -129,7 +129,7 @@ public class InputListener implements Listener {
             return;
         }
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        plugin.getFoliaScheduler().runEntity(player, () -> {
             try {
                 handleChat(player, message);
             } finally {

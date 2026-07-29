@@ -12,16 +12,19 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
 import com.example.homes.HomesPlugin;
-import com.example.homes.util.VanishUtil;
-
 public class HomeTabCompleter implements TabCompleter {
 
     private final HomeManager homeManager;
     private final HomesPlugin plugin;
+    private final OnlinePlayerSnapshotCache playerSnapshots;
 
-    public HomeTabCompleter(HomeManager homeManager, HomesPlugin plugin) {
+    public HomeTabCompleter(
+            HomeManager homeManager,
+            HomesPlugin plugin,
+            OnlinePlayerSnapshotCache playerSnapshots) {
         this.homeManager = homeManager;
         this.plugin = plugin;
+        this.playerSnapshots = playerSnapshots;
     }
 
     @Override
@@ -51,9 +54,7 @@ public class HomeTabCompleter implements TabCompleter {
             // /vhome <player>
             if (cmdName.equals("vhome")) {
                 // Online players
-                for (Player p : player.getServer().getOnlinePlayers()) {
-                    completions.add(p.getName());
-                }
+                completions.addAll(playerSnapshots.onlineNames());
                 
                 // Offline players who have homes (Fetched from DB via HomeManager)
                 // This filters out "random players who joined once" and keeps "active players with homes"
@@ -70,13 +71,9 @@ public class HomeTabCompleter implements TabCompleter {
                 if (!plugin.getConfig().getBoolean("settings.tpa.enabled", true)) {
                     return Collections.emptyList();
                 }
-                for (Player p : player.getServer().getOnlinePlayers()) {
-                    // Exclude self from TPA completion
-                    if (p.getUniqueId().equals(player.getUniqueId())) continue;
-                    // vanish 中の相手は補完候補に出さない (透視権限保持者には表示)
-                    if (VanishUtil.isHiddenFrom(player, p)) continue;
-                    completions.add(p.getName());
-                }
+                completions.addAll(playerSnapshots.visibleTpaNames(
+                        player.getUniqueId(),
+                        player.hasPermission("homes.tpa.seehidden")));
                 // Do NOT include offline players for TPA
             }
             

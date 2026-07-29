@@ -42,7 +42,7 @@ public class DeathListener implements Listener {
             return;
         }
 
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+        plugin.getFoliaScheduler().runEntityLater(event.getPlayer(), () -> {
             if (!event.getPlayer().isOnline()) return;
             String titleStr = plugin.getLanguageManager().getString("back-death-title", "&c死亡しましたか？");
             String subtitleStr = plugin.getLanguageManager().getString("back-death-subtitle", "&a/back &eで戻れます");

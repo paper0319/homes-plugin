@@ -2,6 +2,7 @@ name: homes
 version: ${project.version}
 main: com.example.homes.HomesPlugin
 api-version: "1.21"
+folia-supported: true
 author: paper
 website: https://github.com/paper0319/homes-plugin
 commands:

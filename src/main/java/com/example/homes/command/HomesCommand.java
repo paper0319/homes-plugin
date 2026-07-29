@@ -36,16 +36,25 @@ public class HomesCommand implements CommandExecutor {
                 sender.sendMessage(plugin.msg("no-permission"));
                 return true;
             }
-            plugin.reloadConfig();
-            plugin.reloadValidationSettings();
-            plugin.configureFeatureCommands();
-            LanguageManager languageManager = plugin.getLanguageManager();
-            if (languageManager != null) {
-                languageManager.load();
-            }
-            homeManager.reload();
-            plugin.getServer().getOnlinePlayers().forEach(Player::updateCommands);
-            sender.sendMessage(plugin.msg("reload-success"));
+            plugin.getFoliaScheduler().runGlobal(() -> {
+                plugin.reloadConfig();
+                plugin.reloadValidationSettings();
+                plugin.configureFeatureCommands();
+                LanguageManager languageManager = plugin.getLanguageManager();
+                if (languageManager != null) {
+                    languageManager.load();
+                }
+                homeManager.reload();
+                plugin.getServer().getOnlinePlayers().forEach(player ->
+                        plugin.getFoliaScheduler().runEntity(player, player::updateCommands));
+                if (sender instanceof Player player) {
+                    plugin.getFoliaScheduler().runEntity(
+                            player,
+                            () -> player.sendMessage(plugin.msg("reload-success")));
+                } else {
+                    sender.sendMessage(plugin.msg("reload-success"));
+                }
+            });
             return true;
         }
 
@@ -59,7 +68,7 @@ public class HomesCommand implements CommandExecutor {
                 player.sendMessage(plugin.msg("loading-homes"));
             }
             homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes ->
-                    plugin.getServer().getScheduler().runTask(plugin, () -> {
+                    plugin.getFoliaScheduler().runEntity(player, () -> {
                         if (homes.isEmpty()) {
                             player.sendMessage(plugin.msg("no-homes"));
                             return;

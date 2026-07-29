@@ -34,7 +34,7 @@ public class SetHomeCommand extends PlayerCommandBase {
             player.sendMessage(plugin.msg("loading-homes"));
         }
         homeManager.getHomesAsync(player.getUniqueId()).thenAccept(homes ->
-                plugin.getServer().getScheduler().runTask(plugin, () -> {
+                plugin.getFoliaScheduler().runEntity(player, () -> {
                     if (homes.containsKey(homeName)) {
                         player.sendMessage(plugin.msg("home-exists"));
                         return;

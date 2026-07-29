@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -56,14 +57,44 @@ public class TpaGUI implements Listener {
     }
 
     private void render(Player viewer, int page) {
-        List<Player> others = new ArrayList<>();
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (p.getUniqueId().equals(viewer.getUniqueId())) continue;
-            // vanish 中の相手は一覧に出さない (透視権限保持者には表示)
-            if (VanishUtil.isHiddenFrom(viewer, p)) continue;
-            others.add(p);
+        boolean canSeeHidden = viewer.hasPermission(VanishUtil.SEE_HIDDEN_PERMISSION);
+        List<CompletableFuture<TpaPlayerSnapshot>> pending = new ArrayList<>();
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            if (target == viewer) continue;
+            CompletableFuture<TpaPlayerSnapshot> snapshot = new CompletableFuture<>();
+            plugin.getFoliaScheduler().runEntity(
+                    target,
+                    () -> {
+                        if (!target.isOnline()
+                                || (VanishUtil.isVanished(target) && !canSeeHidden)) {
+                            snapshot.complete(null);
+                            return;
+                        }
+                        snapshot.complete(new TpaPlayerSnapshot(
+                                target.getUniqueId(),
+                                target.getName(),
+                                target.getPlayerProfile()));
+                    },
+                    () -> snapshot.complete(null));
+            pending.add(snapshot);
         }
-        others.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+
+        CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new))
+                .thenRun(() -> {
+                    List<TpaPlayerSnapshot> others = pending.stream()
+                            .map(CompletableFuture::join)
+                            .filter(snapshot -> snapshot != null)
+                            .sorted(Comparator.comparing(
+                                    TpaPlayerSnapshot::name,
+                                    String.CASE_INSENSITIVE_ORDER))
+                            .toList();
+                    plugin.getFoliaScheduler().runEntity(
+                            viewer, () -> renderSnapshots(viewer, page, others));
+                });
+    }
+
+    private void renderSnapshots(
+            Player viewer, int page, List<TpaPlayerSnapshot> others) {
 
         if (others.isEmpty()) {
             viewer.closeInventory();
@@ -85,7 +116,7 @@ public class TpaGUI implements Listener {
         int endIdx = Math.min(startIdx + HEADS_PER_PAGE, others.size());
         List<UUID> heads = new ArrayList<>(endIdx - startIdx);
         for (int i = startIdx; i < endIdx; i++) {
-            heads.add(others.get(i).getUniqueId());
+            heads.add(others.get(i).uuid());
         }
 
         TpaGuiHolder holder = new TpaGuiHolder(page, heads);
@@ -126,17 +157,17 @@ public class TpaGUI implements Listener {
         return item;
     }
 
-    private ItemStack createHead(Player target) {
+    private ItemStack createHead(TpaPlayerSnapshot target) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta meta = head.getItemMeta();
         if (meta instanceof SkullMeta sm) {
             // Use the live PlayerProfile so Bedrock skins applied by
             // GeyserSkinManager (when installed) are picked up automatically.
-            sm.setOwnerProfile(target.getPlayerProfile());
+            sm.setOwnerProfile(target.profile());
         }
         if (meta != null) {
             String nameTmpl = plugin.getConfig().getString("gui.tpa.head.name", "&e{player}");
-            meta.displayName(colorize(nameTmpl.replace("{player}", target.getName())));
+            meta.displayName(colorize(nameTmpl.replace("{player}", target.name())));
             List<String> loreLines = plugin.getConfig().getStringList("gui.tpa.head.lore");
             if (!loreLines.isEmpty()) {
                 List<Component> lore = new ArrayList<>(loreLines.size());
@@ -221,7 +252,7 @@ public class TpaGUI implements Listener {
         UUID targetUuid = holder.getHeads().get(headIndex);
         Player target = Bukkit.getPlayer(targetUuid);
         // クリック後に対象がオフライン/ vanish した場合は弾いて一覧を再描画する
-        if (target == null || VanishUtil.isHiddenFrom(viewer, target)) {
+        if (target == null) {
             viewer.sendMessage(plugin.msg("player-not-found"));
             render(viewer, holder.getPage());
             return;
