@@ -89,7 +89,9 @@ jobs:
           version: ${{ steps.version.outputs.version }}
           version-type: release
 
-          loaders: paper
+          loaders: |
+            paper
+            folia
           game-versions: |
             1.21
             1.21.1

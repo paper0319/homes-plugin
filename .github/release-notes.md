@@ -1,9 +1,14 @@
-2.0.1
-## Compatibility Fixes
+2.0.6
+## Folia and Paper 26.2 Support
 
-- Fixed plugin loading on Paper 1.21.11 by declaring the Bukkit API version as `1.21` instead of the unsupported `26.2` value.
-- Kept release metadata for Paper/Minecraft 26.x while compiling against the lowest supported API line for wider runtime compatibility.
+- Added native Folia support using Paper's Entity, Region, Global Region, and Async schedulers.
+- Reworked teleports to use `teleportAsync()` and region-owned safe-location checks.
+- Made TPA requests, GUIs, tab completion, warmups, shared state, and database callbacks safe for Folia's region threading model.
+- Added `folia-supported: true` and publishes this version for both Paper and Folia on Modrinth.
+- Compiles against the stable Paper 26.2 API while retaining `api-version: 1.21` for compatible 1.21.x servers.
 
-## Build/Test
+## Validation
 
-- Aligned the Paper API and MockBukkit test dependencies with the 1.21 compatibility baseline.
+- 65 automated tests passed.
+- Paper 26.2 compilation and shaded JAR packaging passed.
+- The official Folia 26.2 server build is not available yet, so runtime validation used the latest compatible MockBukkit API and Paper/Folia scheduler contracts.
