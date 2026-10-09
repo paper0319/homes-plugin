@@ -19,7 +19,9 @@ class FoliaCompatibilityTest {
             var descriptor = YamlConfiguration.loadConfiguration(
                     new InputStreamReader(stream, StandardCharsets.UTF_8));
             assertTrue(descriptor.getBoolean("folia-supported"),
-                    "Folia refuses to load plugins that do not opt in");
+                    "Canvas and Folia refuse to load plugins that do not opt in");
+            org.junit.jupiter.api.Assertions.assertEquals("26.3", descriptor.getString("api-version"),
+                    "Paper 26.3 and Canvas 26.3 require a native api-version");
         } catch (java.io.IOException e) {
             throw new AssertionError("Failed to read plugin.yml", e);
         }

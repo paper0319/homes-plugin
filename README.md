@@ -6,7 +6,7 @@
 <a name="english"></a>
 ## English
 
-**HomesPlugin** is a robust and user-friendly Home Management Plugin for Minecraft servers (Spigot/Paper).
+**HomesPlugin** is a robust and user-friendly Home Management Plugin for Paper 26.3+ and Canvas 26.3+.
 This plugin allows players to set multiple homes, manage them via a GUI, share them publicly with others, and includes a full-featured TPA system.
 
 ### ✨ Features
@@ -31,10 +31,10 @@ This plugin allows players to set multiple homes, manage them via a GUI, share t
     *   Integration with Vault to charge for setting homes, teleporting, etc.
 *   **Permission Bypass**:
     *   OPs (or any group via LuckPerms) can bypass the teleport warmup and economy costs.
-*   **Folia support**:
-    *   `folia-supported: true`. Teleports, GUIs, TPA, and database work use Paper's entity/region/global/async schedulers (no Bukkit scheduler).
+*   **Paper 26.3+ and Canvas 26.3+**:
+    *   `api-version: "26.3"` and `folia-supported: true`. Canvas is a Folia fork and loads this plugin. Teleports, GUIs, TPA, and database work use Paper's entity/region/global/async schedulers.
 *   **Fully Configurable**:
-    *   All messages and settings can be customized in `config.yml`.
+    *   Messages and GUI text follow `settings.language` (`ja` or `en`, including `en_us` / `ja_jp`) in `lang/`.
 
 ### 📖 Commands
 
@@ -143,8 +143,8 @@ Developed by **naonao**.
     *   Vaultプラグインと連携し、ホーム設定やテレポートにコストを設定可能。
 *   **権限による Bypass**:
     *   OP（または LuckPerms で任意のグループ）は、テレポート待機時間と利用料金をスキップできます。
-*   **Folia 対応**:
-    *   `folia-supported: true`。テレポート・GUI・TPA・DB は Paper の Entity/Region/Global/Async スケジューラを使います。
+*   **Paper 26.3+ / Canvas 26.3+**:
+    *   `api-version: "26.3"` と `folia-supported: true`。Canvas は Folia フォークで、この宣言があれば読み込みます。テレポート・GUI・TPA・DB は Paper の Entity/Region/Global/Async スケジューラを使います。
 *   **完全な日本語対応**:
     *   メッセージは `config.yml` ですべてカスタマイズ可能。
 

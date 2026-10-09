@@ -53,15 +53,15 @@ public class ConfirmGUI implements Listener {
 
     public void open(Player viewer, UUID targetUuid, String homeName) {
         ConfirmGuiHolder holder = new ConfirmGuiHolder(targetUuid, homeName);
-        Component title = colorize(plugin.getConfig().getString("gui.confirm-delete.title", "&c本当に削除しますか？"));
+        Component title = colorize(text("gui.confirm-delete.title", "&cDelete this home?"));
         Inventory inv = Bukkit.createInventory(holder, 27, title);
         holder.setInventory(inv);
 
         ItemStack yesItem = new ItemStack(Material.LIME_WOOL);
         ItemMeta yesMeta = yesItem.getItemMeta();
         if (yesMeta != null) {
-            yesMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-delete.yes-button.name", "&aはい、削除します")));
-            yesMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-delete.yes-button.lore")));
+            yesMeta.displayName(colorize(text("gui.confirm-delete.yes-button.name", "&aYes, delete")));
+            yesMeta.lore(colorizeLore(plugin.getLanguageManager().textList("gui.confirm-delete.yes-button.lore")));
             yesItem.setItemMeta(yesMeta);
         }
         inv.setItem(SLOT_YES, yesItem);
@@ -70,7 +70,7 @@ public class ConfirmGUI implements Listener {
         ItemMeta infoMeta = infoItem.getItemMeta();
         if (infoMeta != null) {
             infoMeta.displayName(colorize(plugin.getLanguageManager()
-                    .getString("gui-delete-target", "&e削除対象: &6{name}")
+                    .text("gui-delete-target", "&eDeleting: &6{name}")
                     .replace("{name}", homeName)));
             infoItem.setItemMeta(infoMeta);
         }
@@ -79,8 +79,8 @@ public class ConfirmGUI implements Listener {
         ItemStack noItem = new ItemStack(Material.RED_WOOL);
         ItemMeta noMeta = noItem.getItemMeta();
         if (noMeta != null) {
-            noMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-delete.no-button.name", "&cいいえ、キャンセルします")));
-            noMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-delete.no-button.lore")));
+            noMeta.displayName(colorize(text("gui.confirm-delete.no-button.name", "&cNo, cancel")));
+            noMeta.lore(colorizeLore(plugin.getLanguageManager().textList("gui.confirm-delete.no-button.lore")));
             noItem.setItemMeta(noMeta);
         }
         inv.setItem(SLOT_NO, noItem);
@@ -132,6 +132,10 @@ public class ConfirmGUI implements Listener {
                 sessionManager.cleanup(uuid);
             }
         }
+    }
+
+    private String text(String path, String fallback) {
+        return plugin.getLanguageManager().text(path, fallback);
     }
 
     private Component colorize(String text) {

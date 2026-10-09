@@ -75,7 +75,7 @@ public class HomesCommand implements CommandExecutor {
                         }
 
                         player.sendMessage(plugin.msg("home-list-header",
-                                "title", plugin.getConfig().getString("gui.title", "Home List")));
+                                "title", plugin.getLanguageManager().text("gui.title", "Home List")));
                         for (Map.Entry<String, Location> entry : homes.entrySet()) {
                             Location loc = entry.getValue();
                             if (loc != null && loc.getWorld() != null) {

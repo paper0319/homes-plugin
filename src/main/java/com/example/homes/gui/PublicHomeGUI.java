@@ -85,8 +85,8 @@ public class PublicHomeGUI implements Listener {
         if (page >= totalPages) page = totalPages - 1;
         if (page < 0) page = 0;
 
-        String titleBase = plugin.getConfig().getString("gui.vhome.title", "&a公開ホーム一覧");
-        String titleSuffix = plugin.getConfig().getString("gui.vhome.title-page-suffix", " [{page}/{total}]")
+        String titleBase = text("gui.vhome.title", "&aPublic homes");
+        String titleSuffix = text("gui.vhome.title-page-suffix", " [{page}/{total}]")
                 .replace("{page}", String.valueOf(page + 1))
                 .replace("{total}", String.valueOf(totalPages));
         Component title = colorize(titleBase + titleSuffix);
@@ -111,10 +111,10 @@ public class PublicHomeGUI implements Listener {
         inv.setItem(SLOT_REFRESH, createRefreshButton());
 
         if (page > 0) {
-            inv.setItem(SLOT_PREV, createNavButton("gui.vhome.prev-button", "&a← 前のページ"));
+            inv.setItem(SLOT_PREV, createNavButton("gui.vhome.prev-button", "&a<- Previous page"));
         }
         if (page < totalPages - 1) {
-            inv.setItem(SLOT_NEXT, createNavButton("gui.vhome.next-button", "&a次のページ →"));
+            inv.setItem(SLOT_NEXT, createNavButton("gui.vhome.next-button", "&aNext page ->"));
         }
 
         viewer.openInventory(inv);
@@ -137,15 +137,15 @@ public class PublicHomeGUI implements Listener {
         ItemStack head = PlayerHeads.of(home.ownerUuid(), home.ownerName());
         ItemMeta meta = head.getItemMeta();
         if (meta != null) {
-            String nameTmpl = plugin.getConfig().getString("gui.vhome.head.name", "&e{player} &7- &b{name}");
+            String nameTmpl = text("gui.vhome.head.name", "&e{player} &7- &b{name}");
             meta.displayName(colorize(nameTmpl
                     .replace("{player}", home.ownerName())
                     .replace("{name}", home.homeName())));
-            List<String> loreLines = new ArrayList<>(plugin.getConfig().getStringList("gui.vhome.head.lore"));
+            List<String> loreLines = new ArrayList<>(plugin.getLanguageManager().textList("gui.vhome.head.lore"));
             if (loreLines.isEmpty()) {
-                loreLines.add("&7ワールド: {world}");
+                loreLines.add("&7World: {world}");
                 loreLines.add("&7X: {x} Y: {y} Z: {z}");
-                loreLines.add("&eクリックしてテレポート");
+                loreLines.add("&eClick to teleport");
             }
             List<Component> lore = new ArrayList<>(loreLines.size() + 2);
             for (String line : loreLines) {
@@ -158,14 +158,14 @@ public class PublicHomeGUI implements Listener {
                         .replace("{z}", String.valueOf((int) Math.floor(home.z())))));
             }
             if (home.memo() != null && !home.memo().isEmpty()) {
-                lore.add(colorize(plugin.getLanguageManager().getString("gui-status-memo", "&7メモ: {memo}")
+                lore.add(colorize(plugin.getLanguageManager().text("gui-status-memo", "&7Memo: {memo}")
                         .replace("{memo}", home.memo())));
             }
             if (economyManager != null && economyManager.hasEconomy()) {
                 double cost = economyManager.getCost("visit-public");
                 if (cost > 0) {
                     lore.add(colorize(plugin.getLanguageManager()
-                            .getString("gui-visit-public-cost", "&6テレポート費用: {cost} &7(持ち主に入ります)")
+                            .text("gui-visit-public-cost", "&6Teleport cost: {cost} &7(paid to the owner)")
                             .replace("{cost}", economyManager.format(cost))));
                 }
             }
@@ -182,8 +182,8 @@ public class PublicHomeGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString("gui.vhome.refresh-button.name", "&a更新")));
-            List<String> loreLines = plugin.getConfig().getStringList("gui.vhome.refresh-button.lore");
+            meta.displayName(colorize(text("gui.vhome.refresh-button.name", "&aRefresh")));
+            List<String> loreLines = plugin.getLanguageManager().textList("gui.vhome.refresh-button.lore");
             if (!loreLines.isEmpty()) {
                 List<Component> lore = new ArrayList<>(loreLines.size());
                 for (String l : loreLines) lore.add(colorize(l));
@@ -201,7 +201,7 @@ public class PublicHomeGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString(configKeyBase + ".name", defaultName)));
+            meta.displayName(colorize(text(configKeyBase + ".name", defaultName)));
             item.setItemMeta(meta);
         }
         return item;
@@ -260,6 +260,10 @@ public class PublicHomeGUI implements Listener {
         if (event.getView().getTopInventory().getHolder() instanceof PublicHomeGuiHolder) {
             event.setCancelled(true);
         }
+    }
+
+    private String text(String path, String fallback) {
+        return plugin.getLanguageManager().text(path, fallback);
     }
 
     private Component colorize(String text) {

@@ -121,17 +121,17 @@ public class HomeGUI implements Listener {
         else if (favoriteMode) titleKey = "gui.favorite-mode-title";
         else if (memoMode) titleKey = "gui.memo-mode-title";
 
-        String defaultTitle = "ホーム一覧";
-        if (deleteMode) defaultTitle = "&c削除モード (クリックで削除)";
-        else if (publicMode) defaultTitle = "&b公開設定モード (クリックで切替)";
-        else if (renameMode) defaultTitle = "&eリネームモード (クリックで名前変更)";
-        else if (favoriteMode) defaultTitle = "&eお気に入りモード (クリックで切替)";
-        else if (memoMode) defaultTitle = "&eメモ編集モード (クリックで編集)";
+        String defaultTitle = "Home List";
+        if (deleteMode) defaultTitle = "&cDelete mode (click to delete)";
+        else if (publicMode) defaultTitle = "&bPublic mode (click to toggle)";
+        else if (renameMode) defaultTitle = "&eRename mode (click to rename)";
+        else if (favoriteMode) defaultTitle = "&eFavorite mode (click to toggle)";
+        else if (memoMode) defaultTitle = "&eMemo mode (click to edit)";
 
-        String titleText = plugin.getConfig().getString(titleKey, defaultTitle);
+        String titleText = lang(titleKey, defaultTitle);
         if (!isOwner) {
             String name = target.getName() != null ? target.getName() : "Unknown";
-            titleText = plugin.getConfig().getString("gui.title-other", "{player}のホーム").replace("{player}", name);
+            titleText = lang("gui.title-other", "{player}'s homes").replace("{player}", name);
         }
 
         Component title = colorize(titleText);
@@ -160,20 +160,20 @@ public class HomeGUI implements Listener {
             inv.setItem(SLOT_CREATE, buildCreateButton(target));
             inv.setItem(SLOT_RENAME, buildToggleButton(renameMode,
                     renameMode ? Material.NAME_TAG : Material.NAME_TAG,
-                    "gui.rename-button", "&eリネームモード: ON", "&aリネームモード: OFF",
-                    "&7クリックしてモードを終了", "&7クリックしてリネームモードに切替"));
+                    "gui.rename-button", "&eRename mode: ON", "&aRename mode: OFF",
+                    "&7Click to turn OFF", "&7Click to turn ON"));
             inv.setItem(SLOT_FAVORITE, buildToggleButton(favoriteMode,
                     favoriteMode ? Material.NETHER_STAR : Material.FIREWORK_STAR,
-                    "gui.favorite-button", "&eお気に入りモード: ON", "&aお気に入りモード: OFF",
-                    "&7クリックしてOFFにする", "&7クリックしてONにする"));
+                    "gui.favorite-button", "&eFavorite mode: ON", "&aFavorite mode: OFF",
+                    "&7Click to turn OFF", "&7Click to turn ON"));
             inv.setItem(SLOT_MEMO, buildToggleButton(memoMode,
                     memoMode ? Material.WRITABLE_BOOK : Material.BOOK,
-                    "gui.memo-button", "&eメモ編集モード: ON", "&aメモ編集モード: OFF",
-                    "&7クリックしてOFFにする", "&7クリックしてONにする"));
+                    "gui.memo-button", "&eMemo mode: ON", "&aMemo mode: OFF",
+                    "&7Click to turn OFF", "&7Click to turn ON"));
             inv.setItem(SLOT_PUBLIC, buildToggleButton(publicMode,
                     publicMode ? Material.ENDER_EYE : Material.ENDER_PEARL,
-                    "gui.public-button", "&b公開設定モード: ON", "&a公開設定モード: OFF",
-                    "&7クリックしてモードを終了", "&7クリックして公開設定モードに切替"));
+                    "gui.public-button", "&bPublic mode: ON", "&aPublic mode: OFF",
+                    "&7Click to turn OFF", "&7Click to turn ON"));
         }
 
         inv.setItem(SLOT_SEARCH, buildSearchButton(viewer));
@@ -181,23 +181,23 @@ public class HomeGUI implements Listener {
             inv.setItem(SLOT_SPAWN, buildSimpleButton(
                     Material.RECOVERY_COMPASS,
                     "gui.spawn-button.name",
-                    "&aスポーン",
+                    "&aSpawn",
                     "gui.spawn-button.lore",
-                    "&7クリックしてスポーンへ移動"));
+                    "&7Click to teleport to spawn"));
         }
         if (isOwner && plugin.getConfig().getBoolean("settings.back.enabled", true)) {
             inv.setItem(SLOT_BACK, buildSimpleButton(
                     Material.ENDER_EYE,
                     "gui.back-button.name",
-                    "&b戻る",
+                    "&bBack",
                     "gui.back-button.lore",
-                    "&7クリックして死亡地点へ戻る"));
+                    "&7Click to return to your death point"));
         }
 
         if (isOwner || isAdmin) {
             inv.setItem(SLOT_DELETE, buildToggleButton(deleteMode,
                     deleteMode ? Material.TNT : Material.BARRIER,
-                    "gui.delete-button", "&c削除モード: ON", "&a削除モード: OFF",
+                    "gui.delete-button", "&cDelete mode: ON", "&aDelete mode: OFF",
                     null, null));
         }
 
@@ -223,8 +223,8 @@ public class HomeGUI implements Listener {
             holder.mapSlot(slot, homeName);
         }
 
-        if (hasPrev) inv.setItem(SLOT_PREV, buildNavButton(lang("gui-prev-page", "&a← 前のページ")));
-        if (hasNext) inv.setItem(SLOT_NEXT, buildNavButton(lang("gui-next-page", "&a次のページ →")));
+        if (hasPrev) inv.setItem(SLOT_PREV, buildNavButton(lang("gui-prev-page", "&a<- Previous page")));
+        if (hasNext) inv.setItem(SLOT_NEXT, buildNavButton(lang("gui-next-page", "&aNext page ->")));
 
         viewer.openInventory(inv);
     }
@@ -233,8 +233,8 @@ public class HomeGUI implements Listener {
         ItemStack createItem = new ItemStack(Material.ANVIL);
         ItemMeta createMeta = createItem.getItemMeta();
         if (createMeta != null) {
-            createMeta.displayName(colorize(plugin.getConfig().getString("gui.create-button.name", "&aホームを作成する")));
-            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList("gui.create-button.lore"));
+            createMeta.displayName(colorize(lang("gui.create-button.name", "&aCreate a home")));
+            List<String> lore = new ArrayList<>(lines("gui.create-button.lore"));
 
             // 作成ボタンは isOwner のときだけ表示されるため、target は閲覧中の本人 (オンライン)
             int current = homeManager.getHomes(target.getUniqueId()).size();
@@ -244,14 +244,14 @@ public class HomeGUI implements Listener {
             } else {
                 max = plugin.getConfig().getInt("settings.default-home-limit", 1);
             }
-            lore.add(lang("gui-create-count", "&e現在の作成数: {current} / {max}")
+            lore.add(lang("gui-create-count", "&eHomes created: {current} / {max}")
                     .replace("{current}", String.valueOf(current))
                     .replace("{max}", String.valueOf(max)));
 
             if (economyManager != null && economyManager.hasEconomy()) {
                 double cost = plugin.getConfig().getDouble("economy.cost.set-home", 0);
                 if (cost > 0) {
-                    lore.add(lang("gui-create-cost", "&6費用: {cost}").replace("{cost}", economyManager.format(cost)));
+                    lore.add(lang("gui-create-cost", "&6Cost: {cost}").replace("{cost}", economyManager.format(cost)));
                 }
             }
 
@@ -265,15 +265,15 @@ public class HomeGUI implements Listener {
         ItemStack searchItem = new ItemStack(Material.COMPASS);
         ItemMeta searchMeta = searchItem.getItemMeta();
         if (searchMeta != null) {
-            searchMeta.displayName(colorize(plugin.getConfig().getString("gui.search-button.name", "&a検索")));
-            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList("gui.search-button.lore"));
+            searchMeta.displayName(colorize(lang("gui.search-button.name", "&aSearch")));
+            List<String> lore = new ArrayList<>(lines("gui.search-button.lore"));
             if (lore.isEmpty()) {
-                lore.add("&7クリックして検索文字を入力");
-                lore.add("&7'clear' で解除");
+                lore.add("&7Click and type a search");
+                lore.add("&7Type 'clear' to reset");
             }
             String active = sessionManager.getSearchQuery(viewer.getUniqueId());
             if (active != null && !active.isEmpty()) {
-                lore.add(lang("gui-search-active", "&e検索: {query}").replace("{query}", active));
+                lore.add(lang("gui-search-active", "&eSearch: {query}").replace("{query}", active));
             }
             searchMeta.lore(colorizeLore(lore));
             searchItem.setItemMeta(searchMeta);
@@ -285,8 +285,8 @@ public class HomeGUI implements Listener {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString(nameKey, defaultName)));
-            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList(loreKey));
+            meta.displayName(colorize(lang(nameKey, defaultName)));
+            List<String> lore = new ArrayList<>(lines(loreKey));
             if (lore.isEmpty()) {
                 lore.add(defaultLore);
             }
@@ -308,10 +308,10 @@ public class HomeGUI implements Listener {
         if (meta != null) {
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             String nameKey = on ? keyBase + ".name-on" : keyBase + ".name-off";
-            meta.displayName(colorize(plugin.getConfig().getString(nameKey, on ? defaultNameOn : defaultNameOff)));
+            meta.displayName(colorize(lang(nameKey, on ? defaultNameOn : defaultNameOff)));
 
             String loreKey = on ? keyBase + ".lore-on" : keyBase + ".lore-off";
-            List<String> lore = new ArrayList<>(plugin.getConfig().getStringList(loreKey));
+            List<String> lore = new ArrayList<>(lines(loreKey));
             String defaultLore = on ? defaultLoreOn : defaultLoreOff;
             if (lore.isEmpty() && defaultLore != null) {
                 lore.add(defaultLore);
@@ -349,12 +349,11 @@ public class HomeGUI implements Listener {
         ItemMeta meta = item.getItemMeta();
         if (meta == null) return item;
 
-        String nameTmpl = plugin.getConfig().getString("gui.home-icon.name");
-        if (nameTmpl == null) nameTmpl = "&6{name}";
+        String nameTmpl = lang("gui.home-icon.name", "&b{name}");
         meta.displayName(colorize(nameTmpl.replace("{name}", homeName)));
 
         List<String> lore = new ArrayList<>();
-        for (String line : plugin.getConfig().getStringList("gui.home-icon.lore")) {
+        for (String line : lines("gui.home-icon.lore")) {
             lore.add(line.replace("{world}", loc.getWorld().getName())
                     .replace("{x}", String.valueOf(loc.getBlockX()))
                     .replace("{y}", String.valueOf(loc.getBlockY()))
@@ -362,38 +361,38 @@ public class HomeGUI implements Listener {
         }
 
         boolean isPublic = homeManager.isPublic(target.getUniqueId(), homeName);
-        lore.add(isPublic ? lang("gui-status-public", "&a公開中") : lang("gui-status-private", "&c非公開"));
+        lore.add(isPublic ? lang("gui-status-public", "&aPublic") : lang("gui-status-private", "&cPrivate"));
 
         if (isOwner && homeManager.isFavorite(target.getUniqueId(), homeName)) {
-            lore.add(lang("gui-status-favorite", "&6★ お気に入り"));
+            lore.add(lang("gui-status-favorite", "&6* Favorite"));
         }
 
         String memo = homeManager.getMemo(target.getUniqueId(), homeName);
         if (memo != null && !memo.isEmpty()) {
-            lore.add(lang("gui-status-memo", "&7メモ: {memo}").replace("{memo}", memo));
+            lore.add(lang("gui-status-memo", "&7Memo: {memo}").replace("{memo}", memo));
         }
 
         List<String> actionLore = new ArrayList<>();
         if (deleteMode) {
-            actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-delete");
+            actionLore = lines("gui.home-icon.lore-delete");
         } else if (publicMode) {
-            actionLore.add(lang("gui-action-public", "&eクリックして公開/非公開を切り替え"));
+            actionLore.add(lang("gui-action-public", "&eClick to toggle public/private"));
         } else if (renameMode) {
-            actionLore.add(lang("gui-action-rename", "&eクリックして名前を変更"));
+            actionLore.add(lang("gui-action-rename", "&eClick to rename"));
         } else if (favoriteMode) {
-            actionLore.add(lang("gui-action-favorite", "&eクリックしてお気に入りを切り替え"));
+            actionLore.add(lang("gui-action-favorite", "&eClick to toggle favorite"));
         } else if (memoMode) {
-            actionLore.add(lang("gui-action-memo", "&eクリックしてメモを編集"));
+            actionLore.add(lang("gui-action-memo", "&eClick to edit the memo"));
         } else {
-            actionLore = plugin.getConfig().getStringList("gui.home-icon.lore-teleport");
+            actionLore = lines("gui.home-icon.lore-teleport");
             if (economyManager != null && economyManager.hasEconomy()) {
                 boolean publicVisit = !isOwner && homeManager.isPublic(target.getUniqueId(), homeName);
                 String costKey = publicVisit ? "visit-public" : "teleport";
                 double cost = economyManager.getCost(costKey);
                 if (cost > 0) {
                     String costLine = publicVisit
-                            ? lang("gui-visit-public-cost", "&6テレポート費用: {cost} &7(持ち主に入ります)")
-                            : lang("gui-teleport-cost", "&6テレポート費用: {cost}");
+                            ? lang("gui-visit-public-cost", "&6Teleport cost: {cost} &7(paid to the owner)")
+                            : lang("gui-teleport-cost", "&6Teleport cost: {cost}");
                     lore.add(costLine.replace("{cost}", economyManager.format(cost)));
                 }
             }
@@ -405,9 +404,13 @@ public class HomeGUI implements Listener {
         return item;
     }
 
-    /** 言語ファイルの文字列を未加工 (&カラーコード付き) で返す。lore 組み立て用。 */
+    /** 言語ファイルの文字列を未加工 (&カラーコード付き) で返す。config の同梱デフォルトはそのままでは使わない。 */
     private String lang(String key, String def) {
-        return plugin.getLanguageManager().getString(key, def);
+        return plugin.getLanguageManager().text(key, def);
+    }
+
+    private List<String> lines(String key) {
+        return plugin.getLanguageManager().textList(key);
     }
 
     private Component colorize(String text) {

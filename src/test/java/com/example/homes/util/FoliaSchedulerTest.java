@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
@@ -57,11 +56,13 @@ class FoliaSchedulerTest {
     }
 
     @Test
-    void routesDatabaseWorkThroughAsyncScheduler() throws InterruptedException {
+    void routesDatabaseWorkThroughAsyncScheduler() {
         CountDownLatch completed = new CountDownLatch(1);
 
         scheduler.runAsync(completed::countDown);
+        // MockBukkit 26.2 queues Paper's async scheduler until the test drains it.
+        server.getScheduler().waitAsyncTasksFinished();
 
-        assertTrue(completed.await(5, TimeUnit.SECONDS));
+        assertEquals(0, completed.getCount());
     }
 }

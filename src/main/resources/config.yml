@@ -1,6 +1,6 @@
 settings:
-  # 表示に使う言語ファイル (lang/<language>.yml)。標準で ja(日本語) と en(英語) を同梱。
-  # 別の言語を追加したい場合は lang/ フォルダに <language>.yml を作成してください。
+  # 表示言語。ja または en。en_us / ja_jp のように書いても en / ja として読む。
+  # チャットと GUI の文言は lang/<language>.yml。別言語は lang/ に <language>.yml を追加する。
   language: ja
 
   # ============================================================
@@ -90,6 +90,8 @@ sounds:
   delete-success: ENTITY_GENERIC_EXPLODE
   # Set to NONE to disable specific sound
 
+# 下の gui 文言は初期値です。言語ファイルに同じ項目があり、通常はそちらが使われます。
+# ここを書き換えた項目だけ、settings.language より優先されます。素材名 (material) は常にここが正本です。
 gui:
   title: "ホーム一覧"
   # 他プレイヤーのホームを見るとき (/vhome) のタイトル

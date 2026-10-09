@@ -107,8 +107,8 @@ public class TpaGUI implements Listener {
         if (page >= totalPages) page = totalPages - 1;
         if (page < 0) page = 0;
 
-        String titleBase = plugin.getConfig().getString("gui.tpa.title", "&aTPAリクエスト一覧");
-        String titleSuffix = plugin.getConfig().getString("gui.tpa.title-page-suffix", " [{page}/{total}]")
+        String titleBase = text("gui.tpa.title", "&aTPA requests");
+        String titleSuffix = text("gui.tpa.title-page-suffix", " [{page}/{total}]")
                 .replace("{page}", String.valueOf(page + 1))
                 .replace("{total}", String.valueOf(totalPages));
         Component title = colorize(titleBase + titleSuffix);
@@ -136,10 +136,10 @@ public class TpaGUI implements Listener {
         inv.setItem(SLOT_REFRESH, createRefreshButton());
 
         if (page > 0) {
-            inv.setItem(SLOT_PREV, createNavButton("gui.tpa.prev-button", "&a← 前のページ"));
+            inv.setItem(SLOT_PREV, createNavButton("gui.tpa.prev-button", "&a<- Previous page"));
         }
         if (page < totalPages - 1) {
-            inv.setItem(SLOT_NEXT, createNavButton("gui.tpa.next-button", "&a次のページ →"));
+            inv.setItem(SLOT_NEXT, createNavButton("gui.tpa.next-button", "&aNext page ->"));
         }
 
         viewer.openInventory(inv);
@@ -165,9 +165,9 @@ public class TpaGUI implements Listener {
             PlayerHeads.applySkin(sm, target.profile());
         }
         if (meta != null) {
-            String nameTmpl = plugin.getConfig().getString("gui.tpa.head.name", "&e{player}");
+            String nameTmpl = text("gui.tpa.head.name", "&e{player}");
             meta.displayName(colorize(nameTmpl.replace("{player}", target.name())));
-            List<String> loreLines = plugin.getConfig().getStringList("gui.tpa.head.lore");
+            List<String> loreLines = plugin.getLanguageManager().textList("gui.tpa.head.lore");
             if (!loreLines.isEmpty()) {
                 List<Component> lore = new ArrayList<>(loreLines.size());
                 for (String l : loreLines) lore.add(colorize(l));
@@ -185,8 +185,8 @@ public class TpaGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString("gui.tpa.refresh-button.name", "&a更新")));
-            List<String> loreLines = plugin.getConfig().getStringList("gui.tpa.refresh-button.lore");
+            meta.displayName(colorize(text("gui.tpa.refresh-button.name", "&aRefresh")));
+            List<String> loreLines = plugin.getLanguageManager().textList("gui.tpa.refresh-button.lore");
             if (!loreLines.isEmpty()) {
                 List<Component> lore = new ArrayList<>(loreLines.size());
                 for (String l : loreLines) lore.add(colorize(l));
@@ -204,7 +204,7 @@ public class TpaGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString(configKeyBase + ".name", defaultName)));
+            meta.displayName(colorize(text(configKeyBase + ".name", defaultName)));
             item.setItemMeta(meta);
         }
         return item;
@@ -267,6 +267,10 @@ public class TpaGUI implements Listener {
         if (event.getView().getTopInventory().getHolder() instanceof TpaGuiHolder) {
             event.setCancelled(true);
         }
+    }
+
+    private String text(String path, String fallback) {
+        return plugin.getLanguageManager().text(path, fallback);
     }
 
     private Component colorize(String text) {

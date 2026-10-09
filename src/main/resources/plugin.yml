@@ -1,7 +1,9 @@
 name: homes
 version: ${project.version}
 main: com.example.homes.HomesPlugin
-api-version: "1.21"
+# Paper 26.3+ and Canvas 26.3+ (Folia fork). Canvas loads this plugin because
+# folia-supported is set; the plugin uses Paper's region schedulers only.
+api-version: "26.3"
 folia-supported: true
 author: paper
 website: https://github.com/paper0319/homes-plugin

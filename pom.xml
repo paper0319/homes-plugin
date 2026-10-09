@@ -5,7 +5,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>HomesPlugin</artifactId>
-    <version>2.0.8</version>
+    <version>2.0.9</version>
     <packaging>jar</packaging>
 
     <name>HomesPlugin</name>
@@ -38,7 +38,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>26.2.build.84-stable</version>
+            <version>26.3.build.166-beta</version>
             <scope>provided</scope>
         </dependency>
         <!-- H2 Database -->
@@ -84,8 +84,8 @@
         </dependency>
         <dependency>
             <groupId>org.mockbukkit.mockbukkit</groupId>
-            <artifactId>mockbukkit-v26.1.2</artifactId>
-            <version>4.114.0</version>
+            <artifactId>mockbukkit-v26.2</artifactId>
+            <version>4.117.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -112,9 +112,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
                 <configuration>
-                    <!-- MockBukkit 26.1.2 is the newest published test runtime.
-                         Compile against Paper 26.2, but run MockBukkit with its
-                         matching registry/API data until a 26.2 artifact ships. -->
+                    <!-- Compile against Paper 26.3. MockBukkit 26.2 is the newest
+                         published test runtime, so tests run on its Paper 26.2 API. -->
                     <classpathDependencyExcludes>
                         <classpathDependencyExclude>io.papermc.paper:paper-api</classpathDependencyExclude>
                         <classpathDependencyExclude>net.kyori:adventure-api</classpathDependencyExclude>
@@ -131,7 +130,7 @@
                         <additionalClasspathDependency>
                             <groupId>io.papermc.paper</groupId>
                             <artifactId>paper-api</artifactId>
-                            <version>26.1.2.build.74-stable</version>
+                            <version>26.2.build.132-stable</version>
                         </additionalClasspathDependency>
                     </additionalClasspathDependencies>
                     <systemPropertyVariables>

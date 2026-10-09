@@ -66,7 +66,7 @@ public class TpaActionGUI implements Listener {
 
     private void render(Player viewer, TpaPlayerSnapshot target) {
         TpaActionGuiHolder holder = new TpaActionGuiHolder(target.uuid());
-        String titleTmpl = plugin.getConfig().getString("gui.tpa-action.title", "&a{player}にリクエスト");
+        String titleTmpl = text("gui.tpa-action.title", "&aRequest {player}");
         Component title = colorize(titleTmpl.replace("{player}", target.name()));
         Inventory inv = Bukkit.createInventory(holder, GUI_SIZE, title);
         holder.setInventory(inv);
@@ -104,8 +104,8 @@ public class TpaActionGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString(configKeyBase + ".name", defaultName)));
-            List<String> loreLines = plugin.getConfig().getStringList(configKeyBase + ".lore");
+            meta.displayName(colorize(text(configKeyBase + ".name", defaultName)));
+            List<String> loreLines = plugin.getLanguageManager().textList(configKeyBase + ".lore");
             if (!loreLines.isEmpty()) {
                 List<Component> lore = new ArrayList<>(loreLines.size());
                 for (String l : loreLines) lore.add(colorize(l.replace("{player}", playerName)));
@@ -136,7 +136,7 @@ public class TpaActionGUI implements Listener {
         ItemStack item = new ItemStack(mat);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(colorize(plugin.getConfig().getString("gui.tpa-action.back-button.name", "&c← 戻る")));
+            meta.displayName(colorize(text("gui.tpa-action.back-button.name", "&c<- Back")));
             item.setItemMeta(meta);
         }
         return item;
@@ -181,6 +181,10 @@ public class TpaActionGUI implements Listener {
         if (event.getView().getTopInventory().getHolder() instanceof TpaActionGuiHolder) {
             event.setCancelled(true);
         }
+    }
+
+    private String text(String path, String fallback) {
+        return plugin.getLanguageManager().text(path, fallback);
     }
 
     private Component colorize(String text) {

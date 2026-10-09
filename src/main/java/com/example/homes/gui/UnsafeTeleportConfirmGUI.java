@@ -58,15 +58,15 @@ public class UnsafeTeleportConfirmGUI implements Listener {
      */
     public void open(Player viewer, Location target, TeleportPayment payment) {
         UnsafeTeleportGuiHolder holder = new UnsafeTeleportGuiHolder(target, payment);
-        Component title = colorize(plugin.getConfig().getString("gui.confirm-teleport.title", "&c危険な場所へテレポート？"));
+        Component title = colorize(text("gui.confirm-teleport.title", "&cTeleport into danger?"));
         Inventory inv = Bukkit.createInventory(holder, 27, title);
         holder.setInventory(inv);
 
         ItemStack yesItem = new ItemStack(Material.LIME_WOOL);
         ItemMeta yesMeta = yesItem.getItemMeta();
         if (yesMeta != null) {
-            yesMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-teleport.yes-button.name", "&aはい、テレポートします")));
-            yesMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-teleport.yes-button.lore")));
+            yesMeta.displayName(colorize(text("gui.confirm-teleport.yes-button.name", "&aYes, teleport")));
+            yesMeta.lore(colorizeLore(plugin.getLanguageManager().textList("gui.confirm-teleport.yes-button.lore")));
             yesItem.setItemMeta(yesMeta);
         }
         inv.setItem(SLOT_YES, yesItem);
@@ -74,8 +74,8 @@ public class UnsafeTeleportConfirmGUI implements Listener {
         ItemStack infoItem = new ItemStack(Material.PAPER);
         ItemMeta infoMeta = infoItem.getItemMeta();
         if (infoMeta != null) {
-            infoMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-teleport.info.name", "&e危険な足場のため確認が必要です")));
-            infoMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-teleport.info.lore")));
+            infoMeta.displayName(colorize(text("gui.confirm-teleport.info.name", "&eUnsafe ground, confirmation required")));
+            infoMeta.lore(colorizeLore(plugin.getLanguageManager().textList("gui.confirm-teleport.info.lore")));
             infoItem.setItemMeta(infoMeta);
         }
         inv.setItem(SLOT_INFO, infoItem);
@@ -83,8 +83,8 @@ public class UnsafeTeleportConfirmGUI implements Listener {
         ItemStack noItem = new ItemStack(Material.RED_WOOL);
         ItemMeta noMeta = noItem.getItemMeta();
         if (noMeta != null) {
-            noMeta.displayName(colorize(plugin.getConfig().getString("gui.confirm-teleport.no-button.name", "&cいいえ、やめます")));
-            noMeta.lore(colorizeLore(plugin.getConfig().getStringList("gui.confirm-teleport.no-button.lore")));
+            noMeta.displayName(colorize(text("gui.confirm-teleport.no-button.name", "&cNo, cancel")));
+            noMeta.lore(colorizeLore(plugin.getLanguageManager().textList("gui.confirm-teleport.no-button.lore")));
             noItem.setItemMeta(noMeta);
         }
         inv.setItem(SLOT_NO, noItem);
@@ -134,6 +134,10 @@ public class UnsafeTeleportConfirmGUI implements Listener {
         if (holder.isResolved()) return;
         holder.setResolved(true);
         economyManager.refund((Player) event.getPlayer(), holder.getRefundCostKey());
+    }
+
+    private String text(String path, String fallback) {
+        return plugin.getLanguageManager().text(path, fallback);
     }
 
     private Component colorize(String text) {

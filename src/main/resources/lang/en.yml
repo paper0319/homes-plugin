@@ -131,3 +131,149 @@ gui-next-page: "&aNext page ->"
 gui-delete-target: "&eDeleting: &6{name}"
 gui-search-active: "&eSearch: {query}"
 save-failed: "&cFailed to save your data. Please contact an administrator."
+
+# GUI text. Materials stay in config.yml.
+gui:
+  title: "Home List"
+  title-other: "{player}'s homes"
+  delete-mode-title: "&cDelete mode (click to delete)"
+  public-mode-title: "&bPublic mode (click to toggle)"
+  rename-mode-title: "&eRename mode (click to rename)"
+  favorite-mode-title: "&eFavorite mode (click to toggle)"
+  memo-mode-title: "&eMemo mode (click to edit)"
+  create-button:
+    name: "&aCreate a home"
+    lore:
+      - "&7Click and type a name"
+  rename-button:
+    name-off: "&aRename mode: OFF"
+    name-on: "&eRename mode: ON"
+    lore-off:
+      - "&7Click to turn ON"
+    lore-on:
+      - "&7Click to turn OFF"
+      - "&eClick a home, then type a new name in chat"
+  delete-button:
+    name-off: "&aDelete mode: OFF"
+    name-on: "&cDelete mode: ON"
+    lore-off:
+      - "&7Click to turn ON"
+    lore-on:
+      - "&7Click to turn OFF"
+      - "&cClick a home to confirm deletion"
+  public-button:
+    name-off: "&aPublic mode: OFF"
+    name-on: "&bPublic mode: ON"
+    lore-off:
+      - "&7Click to turn ON"
+    lore-on:
+      - "&7Click to turn OFF"
+      - "&bClick a home to toggle public or private"
+  search-button:
+    name: "&aSearch"
+    lore:
+      - "&7Click and type a search"
+      - "&7Type 'clear' to reset"
+  spawn-button:
+    name: "&aSpawn"
+    lore:
+      - "&7Click to teleport to spawn"
+  back-button:
+    name: "&bBack"
+    lore:
+      - "&7Click to return to your death point"
+  favorite-button:
+    name-off: "&aFavorite mode: OFF"
+    name-on: "&eFavorite mode: ON"
+    lore-off:
+      - "&7Click to turn ON"
+    lore-on:
+      - "&7Click to turn OFF"
+      - "&eClick a home to toggle favorite"
+  memo-button:
+    name-off: "&aMemo mode: OFF"
+    name-on: "&eMemo mode: ON"
+    lore-off:
+      - "&7Click to turn ON"
+    lore-on:
+      - "&7Click to turn OFF"
+      - "&eClick a home to edit its memo"
+  home-icon:
+    name: "&b{name}"
+    lore:
+      - "&7World: {world}"
+      - "&7X: {x} Y: {y} Z: {z}"
+    lore-teleport:
+      - "&eClick to teleport"
+    lore-delete:
+      - "&cClick to delete"
+  confirm-delete:
+    title: "&cDelete this home?"
+    yes-button:
+      name: "&aYes, delete"
+      lore:
+        - "&7This cannot be undone"
+    no-button:
+      name: "&cNo, cancel"
+      lore:
+        - "&7Return to the home list"
+  confirm-teleport:
+    title: "&cTeleport into danger?"
+    yes-button:
+      name: "&aYes, teleport"
+      lore:
+        - "&7There is no safe ground"
+        - "&7Watch for falls and lava"
+    info:
+      name: "&eUnsafe ground, confirmation required"
+      lore:
+        - "&7You may take damage"
+        - "&7if you continue"
+    no-button:
+      name: "&cNo, cancel"
+      lore:
+        - "&7Cancel the teleport"
+  tpa:
+    title: "&aTPA requests"
+    title-page-suffix: " [{page}/{total}]"
+    refresh-button:
+      name: "&aRefresh"
+      lore:
+        - "&7Reload the online list"
+    prev-button:
+      name: "&a<- Previous page"
+    next-button:
+      name: "&aNext page ->"
+    head:
+      name: "&e{player}"
+      lore:
+        - "&7Click to select"
+  vhome:
+    title: "&aPublic homes"
+    title-page-suffix: " [{page}/{total}]"
+    refresh-button:
+      name: "&aRefresh"
+      lore:
+        - "&7Reload public homes"
+    prev-button:
+      name: "&a<- Previous page"
+    next-button:
+      name: "&aNext page ->"
+    head:
+      name: "&e{player} &7- &b{name}"
+      lore:
+        - "&7World: {world}"
+        - "&7X: {x} Y: {y} Z: {z}"
+        - "&eClick to teleport"
+  tpa-action:
+    title: "&aRequest {player}"
+    tpa-button:
+      name: "&b/TPA"
+      lore:
+        - "&7You teleport to {player}"
+    tpahere-button:
+      name: "&a/TPAHere"
+      lore:
+        - "&7Summon {player} to you"
+    back-button:
+      name: "&c<- Back"

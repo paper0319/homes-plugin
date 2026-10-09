@@ -129,3 +129,149 @@ spawn-success: "&aスポーンへテレポートしました。"
 spawn-set: "&aスポーン地点を設定しました。"
 spawn-not-set: "&cスポーン地点がまだ設定されていません。"
 spawn-feature-disabled: "&c/spawn コマンドは無効化されています。"
+
+# GUI 文言。素材名は config.yml のまま。
+gui:
+  title: "ホーム一覧"
+  title-other: "{player}のホーム"
+  delete-mode-title: "&c削除モード (クリックで削除)"
+  public-mode-title: "&b公開設定モード (クリックで切替)"
+  rename-mode-title: "&eリネームモード (クリックで名前変更)"
+  favorite-mode-title: "&eお気に入りモード (クリックで切替)"
+  memo-mode-title: "&eメモ編集モード (クリックで編集)"
+  create-button:
+    name: "&aホームを作成する"
+    lore:
+      - "&7クリックして名前を入力"
+  rename-button:
+    name-off: "&aリネームモード: OFF"
+    name-on: "&eリネームモード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&eホームをクリックするとチャットで新しい名前を入力できます"
+  delete-button:
+    name-off: "&a削除モード: OFF"
+    name-on: "&c削除モード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&cホームをクリックすると削除確認画面へ移動します！"
+  public-button:
+    name-off: "&a公開設定モード: OFF"
+    name-on: "&b公開設定モード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&bホームをクリックすると公開/非公開を切り替えます"
+  search-button:
+    name: "&a検索"
+    lore:
+      - "&7クリックして検索文字を入力"
+      - "&7'clear' で解除"
+  spawn-button:
+    name: "&aスポーン"
+    lore:
+      - "&7クリックしてスポーンへ移動"
+  back-button:
+    name: "&b戻る"
+    lore:
+      - "&7クリックして死亡地点へ戻る"
+  favorite-button:
+    name-off: "&aお気に入りモード: OFF"
+    name-on: "&eお気に入りモード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&eホームをクリックするとお気に入りを切り替えます"
+  memo-button:
+    name-off: "&aメモ編集モード: OFF"
+    name-on: "&eメモ編集モード: ON"
+    lore-off:
+      - "&7クリックしてONにする"
+    lore-on:
+      - "&7クリックしてOFFにする"
+      - "&eホームをクリックするとメモを編集できます"
+  home-icon:
+    name: "&b{name}"
+    lore:
+      - "&7ワールド: {world}"
+      - "&7X: {x} Y: {y} Z: {z}"
+    lore-teleport:
+      - "&eクリックしてテレポート"
+    lore-delete:
+      - "&cクリックして削除"
+  confirm-delete:
+    title: "&c本当に削除しますか？"
+    yes-button:
+      name: "&aはい、削除します"
+      lore:
+        - "&7この操作は取り消せません"
+    no-button:
+      name: "&cいいえ、キャンセルします"
+      lore:
+        - "&7ホーム一覧に戻ります"
+  confirm-teleport:
+    title: "&c危険な場所へテレポート？"
+    yes-button:
+      name: "&aはい、テレポートします"
+      lore:
+        - "&7安全な足場が無い場所です"
+        - "&7落下・溶岩などに注意してください"
+    info:
+      name: "&e危険な足場のため確認が必要です"
+      lore:
+        - "&7このまま進むとダメージを受ける"
+        - "&7可能性があります"
+    no-button:
+      name: "&cいいえ、やめます"
+      lore:
+        - "&7テレポートをキャンセルします"
+  tpa:
+    title: "&aTPAリクエスト一覧"
+    title-page-suffix: " [{page}/{total}]"
+    refresh-button:
+      name: "&a更新"
+      lore:
+        - "&7オンラインリストを再取得"
+    prev-button:
+      name: "&a← 前のページ"
+    next-button:
+      name: "&a次のページ →"
+    head:
+      name: "&e{player}"
+      lore:
+        - "&7クリックして選択"
+  vhome:
+    title: "&a公開ホーム一覧"
+    title-page-suffix: " [{page}/{total}]"
+    refresh-button:
+      name: "&a更新"
+      lore:
+        - "&7公開ホーム一覧を再取得"
+    prev-button:
+      name: "&a← 前のページ"
+    next-button:
+      name: "&a次のページ →"
+    head:
+      name: "&e{player} &7- &b{name}"
+      lore:
+        - "&7ワールド: {world}"
+        - "&7X: {x} Y: {y} Z: {z}"
+        - "&eクリックしてテレポート"
+  tpa-action:
+    title: "&a{player}にリクエスト"
+    tpa-button:
+      name: "&b/TPA"
+      lore:
+        - "&7あなたが {player} のところへ移動"
+    tpahere-button:
+      name: "&a/TPAHere"
+      lore:
+        - "&7{player} をあなたのところへ呼ぶ"
+    back-button:
+      name: "&c← 戻る"
