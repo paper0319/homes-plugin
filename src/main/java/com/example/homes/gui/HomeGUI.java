@@ -242,7 +242,7 @@ public class HomeGUI implements Listener {
             if (target.isOnline()) {
                 max = homeManager.getMaxHomes((Player) target);
             } else {
-                max = plugin.getConfig().getInt("settings.default-home-limit", 1);
+                max = plugin.getConfig().getInt("settings.default-home-limit", 10);
             }
             lore.add(lang("gui-create-count", "&eHomes created: {current} / {max}")
                     .replace("{current}", String.valueOf(current))

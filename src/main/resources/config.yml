@@ -12,7 +12,7 @@ settings:
   #   homes.limit.<数字>      例: homes.limit.10  → 最大10個まで
   #   homes.limit.unlimited   → 無制限
   # 複数の数字権限を持つ場合は一番大きい値が使われます。
-  default-home-limit: 3
+  default-home-limit: 10
 
   # ホーム名・メモに入力できる最大文字数
   max-home-name-length: 32

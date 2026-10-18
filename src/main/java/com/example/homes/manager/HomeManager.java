@@ -332,7 +332,7 @@ public class HomeManager {
 
         if (unlimited) return Integer.MAX_VALUE;
         if (maxFromPerm >= 0) return maxFromPerm;
-        return plugin.getConfig().getInt("settings.default-home-limit", 3);
+        return plugin.getConfig().getInt("settings.default-home-limit", 10);
     }
 
     public boolean canSetHome(Player player) {
