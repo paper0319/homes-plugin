@@ -348,14 +348,6 @@ public class HomesPlugin extends JavaPlugin {
             cfg.set("settings.op-home-limit", null);
             changed = true;
         }
-        // 旧デフォルトの 3 個を、基本上限 10 個へ一度だけ上げる。
-        if (!cfg.getBoolean("settings.home-limit-raised", false)) {
-            if (cfg.getInt("settings.default-home-limit", 10) == 3) {
-                cfg.set("settings.default-home-limit", 10);
-                getLogger().info("ホームの基本上限を 10 個に更新しました。");
-            }
-            cfg.set("settings.home-limit-raised", true);
-        }
 
         if (changed) {
             getLogger().info("============================================================");

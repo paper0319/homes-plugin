@@ -79,7 +79,7 @@ settings:
   language: ja           # Language file: lang/<language>.yml (ja / en bundled)
 
   # Base home limit applied to everyone (including OPs) without a limit permission.
-  default-home-limit: 10
+  default-home-limit: 3
   # Override per player/group with LuckPerms (not in config):
   #   homes.limit.<number>  e.g. homes.limit.10 -> up to 10 homes
   #   homes.limit.unlimited -> no limit
@@ -189,7 +189,7 @@ settings:
   language: ja           # 表示言語ファイル lang/<language>.yml (ja / en 同梱)
 
   # 全員共通の基本ホーム上限 (権限が無ければ OP もこの値)
-  default-home-limit: 10
+  default-home-limit: 3
   # 個別に変えたい場合は LuckPerms 等で権限付与 (configでは設定しません):
   #   homes.limit.<数字>    例: homes.limit.10 → 最大10個
   #   homes.limit.unlimited → 無制限
